@@ -216,3 +216,28 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Personal project notes (LOCAL ONLY - DO NOT COMMIT)
+PERSONAL_PROJECT_NOTES.txt
+
+# Environment variables (DO NOT COMMIT)
+.env
+.env.local
+
+# Python development
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Logs
+*.log
+
