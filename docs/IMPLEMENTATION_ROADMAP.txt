@@ -1,0 +1,417 @@
+
+╔════════════════════════════════════════════════════════════════════════════╗
+║         ENERGY INTELLIGENCE AGENT - 6-WEEK IMPLEMENTATION PLAN             ║
+║              Phase 2 Core Project: RAG + Python Fluency                    ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WEEK 1: Setup + Data Pipeline Foundation
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Goal: pgvector + PostgreSQL running with synthetic energy data loaded
+
+CODING TASKS:
+  ✓ Task 1.1: Docker Compose setup
+    - PostgreSQL 15 with pgvector extension
+    - Hot reload for local development
+    - Script: infrastructure/docker-compose.yml
+    - Learning: Infrastructure as code, Docker networking
+  
+  ✓ Task 1.2: Data models (Pydantic v2)
+    - RetrievedDocument, DispatchRecommendation, AuditLogEntry
+    - Type hints (not Optional, use | None notation)
+    - Frozen=True for immutability in safety-critical path
+    - Script: src/models.py
+    - Learning: Pydantic schema design, type safety, validation
+  
+  ✓ Task 1.3: Document ingestion pipeline
+    - Load synthetic energy docs (regulations, tariffs, historical decisions)
+    - Implement semantic chunking (split at regulatory boundaries)
+    - Show trade-off analysis: semantic vs fixed-size vs sliding window
+    - Script: src/data_pipeline/ingest.py
+    - Learning: LLM-friendly chunking, document structure preservation
+
+DELIVERABLES:
+  - Docker Compose file (verify: docker-compose up, database accessible)
+  - 3 Pydantic model files with docstrings and validation rules
+  - Chunking pipeline with A/B test framework (compare 3 strategies)
+  - Synthetic dataset: ~100 documents (regulations, customer data, market data)
+
+CHECKPOINT:
+  [ ] Run: docker-compose up && python -m pytest tests/test_models.py -v
+  [ ] All tests pass
+  [ ] Can instantiate models, validate data types
+  [ ] Chunking metrics: avg chunk size, max chunk size, overlap %
+
+LEARNING FOCUS:
+  - Type hints depth: generics, Protocols, TypedDict
+  - Pydantic v2 syntax (BaseModel, ConfigDict, Field)
+  - Async context patterns (asyncio setup, no blocking calls)
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WEEK 2: Vector Embedding + Retrieval Setup
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Goal: BM25 + semantic search working with evaluation framework
+
+CODING TASKS:
+  ✓ Task 2.1: Embedding & pgvector storage
+    - OpenAI Embeddings API (or Claude Embeddings if available)
+    - Store embeddings in pgvector with HNSW indexing
+    - Batch API calls (async, efficient)
+    - Script: src/retriever/embeddings.py
+    - Learning: Embedding normalization, efficient batch processing
+
+  ✓ Task 2.2: BM25 search (PostgreSQL tsvector)
+    - Full-text search config: English dictionary, phrase search
+    - Query expansion for domain terms (e.g., "peak demand" → "peak" OR "demand response")
+    - Script: src/retriever/bm25_search.py
+    - Learning: PostgreSQL full-text search, query normalization
+
+  ✓ Task 2.3: Hybrid retriever (HybridRetriever class)
+    - Semantic search using pgvector (async)
+    - BM25 search (async)
+    - Reciprocal Rank Fusion (RRF) to combine rankings
+    - CRITICAL: Document why RRF matters (semantic misses domain terms, BM25 misses similarity)
+    - Script: src/retriever/hybrid_retriever.py
+    - Learning: Ranking fusion, why multiple strategies matter
+
+  ✓ Task 2.4: Retrieval evaluation framework
+    - Synthetic test set: 10–15 queries with ground truth answers
+    - Metrics: Precision@K, NDCG, hit rate, latency
+    - A/B test configurations (BM25 only vs semantic only vs hybrid)
+    - Show results table: why hybrid wins
+    - Script: eval/retrieval_evals.py
+    - Learning: Evaluation design, metric interpretation
+
+DELIVERABLES:
+  - HybridRetriever class (fully typed, async)
+  - pgvector schema + indexes (HNSW, L2 distance)
+  - Evaluation results: table showing hybrid > any single strategy
+  - VECTOR_DB_ANALYSIS.md: pgvector vs Pinecone vs Chroma comparison
+
+CHECKPOINT:
+  [ ] Run: python -m pytest tests/test_retriever.py -v
+  [ ] Retrieval latency < 500ms (p95)
+  [ ] Hybrid Precision@5 ≥ 0.7
+  [ ] A/B test results documented with impact analysis
+
+LEARNING FOCUS:
+  - Async I/O patterns: asyncio.gather, concurrent requests
+  - Ranking algorithms: TF-IDF, BM25, RRF math
+  - Vector distance metrics and index structures (HNSW vs IVFFlat)
+  - Evaluation methodology: avoiding test data leakage, metric pitfalls
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WEEK 3: Claude Integration + Recommendation Engine
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Goal: Claude generating grounded dispatch recommendations
+
+CODING TASKS:
+  ✓ Task 3.1: Claude API wrapper with structured output
+    - Messages API with system + user prompts
+    - Force grounding: "You MUST cite which documents support this recommendation"
+    - Structured output (JSON schema) for DispatchRecommendation
+    - Retry logic for rate limits (exponential backoff)
+    - Script: src/recommendation_engine/claude_client.py
+    - Learning: Prompt design for grounding, structured output patterns
+
+  ✓ Task 3.2: Prompt engineering & grounding
+    - System prompt that enforces citation of context
+    - Few-shot examples: good dispatch recommendation (well-cited) vs bad (hallucinated)
+    - Prompt: ALWAYS ground in provided context. If cannot answer, say so.
+    - Script: src/recommendation_engine/prompts.py
+    - Learning: Responsible AI prompt patterns, avoiding hallucinations via design
+
+  ✓ Task 3.3: Hallucination detection
+    - Simple: check if recommendation terms appear in retrieved context (≥30%)
+    - Production: semantic similarity check using embeddings
+    - Flag for human review if hallucination likely
+    - Script: src/recommendation_engine/safety.py
+    - Learning: Hallucination detection strategies, calibrating thresholds
+
+  ✓ Task 3.4: Recommendation engine tests
+    - Test: Claude generates action grounded in context
+    - Test: Hallucination detection catches contradictions
+    - Test: Confidence score correlates with reasoning quality
+    - Script: tests/test_recommendation_engine.py
+    - Learning: Testing LLM-based systems, mocking Claude API
+
+DELIVERABLES:
+  - RecommendationEngine class (fully typed, async)
+  - Prompt templates (system, user examples)
+  - Hallucination detection logic with configurable threshold
+  - Test suite covering edge cases (empty context, contradictions, low confidence)
+
+CHECKPOINT:
+  [ ] Run: python -m pytest tests/test_recommendation_engine.py -v
+  [ ] All recommendations properly typed as DispatchRecommendation
+  [ ] Hallucination detection catches 80%+ of test contradictions
+  [ ] Claude API calls work (may be mocked in tests)
+  [ ] Code review with senior engineer: Prompt design, safety logic
+
+LEARNING FOCUS:
+  - Prompt design for grounding and preventing hallucinations
+  - Structured output (JSON schema validation)
+  - Error handling for external API calls (Claude, Embeddings)
+  - Testing LLM-based systems without expensive API calls
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WEEK 4: Responsible AI Architecture + Audit Trail
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Goal: Every decision traced, auditable, grounded in evidence
+
+CODING TASKS:
+  ✓ Task 4.1: Confidence scoring & calibration
+    - Confidence score (0–100) on every recommendation
+    - Calibration: confidence should predict accuracy
+    - Use validation set to find threshold for "requires human review" (default: <60%)
+    - Script: src/recommendation_engine/confidence.py
+    - Learning: Calibration curves, confidence validation
+
+  ✓ Task 4.2: Audit logging
+    - Log every decision: timestamp, query, retrieved docs, recommendation, confidence
+    - Immutable audit trail (append-only log or dedicated audit table)
+    - Serialize for traceability: JSON or structured format
+    - Script: src/audit/audit_log.py
+    - Learning: Audit design for compliance, immutability patterns
+
+  ✓ Task 4.3: Regulatory constraint checking
+    - Parse retrieved regulations and extract constraints
+    - Before returning recommendation, validate against constraints
+    - Flag violations for manual review
+    - Script: src/safety/constraint_validator.py
+    - Learning: Rule extraction, constraint satisfaction patterns
+
+  ✓ Task 4.4: Safety architecture documentation
+    - SAFETY.md: How we detect hallucinations, confidence scoring, audit trail
+    - Decision tree: what triggers human review?
+    - Example traces: good recommendation (well-grounded), bad (caught and flagged)
+    - Script: docs/SAFETY.md
+    - Learning: Technical writing for safety-critical systems
+
+DELIVERABLES:
+  - Confidence scoring module with validation
+  - Audit log with JSON serialization and query interface
+  - Constraint validator (extracts rules from context, checks recommendations)
+  - SAFETY.md documentation with examples and decision tree
+
+CHECKPOINT:
+  [ ] Run: python -c "from src.audit import AuditLog; log = AuditLog(); print(log.record(...))"
+  [ ] Sample audit entries serialize/deserialize correctly
+  [ ] Constraint validator catches regulatory violations (test cases)
+  [ ] Confidence scores on validation set: Brier score < 0.2 (well-calibrated)
+  [ ] SAFETY.md reviewed for clarity and completeness
+
+LEARNING FOCUS:
+  - Designing for auditability and compliance
+  - Confidence calibration (ECE, MCE metrics)
+  - Rule-based constraint checking (parsing, matching, validation)
+  - Documentation for safety-critical systems
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WEEK 5: Orchestration + End-to-End Integration
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Goal: Full pipeline working: query → retrieve → recommend → audit
+
+CODING TASKS:
+  ✓ Task 5.1: EnergyIntelligenceAgent orchestrator
+    - Main entry point: dispatch(query) → Recommendation
+    - Compose: retrieve() → recommend() → audit()
+    - Error handling: graceful degradation (fallback to human review)
+    - Script: src/agent/energy_agent.py
+    - Learning: Orchestration patterns, composition over inheritance
+
+  ✓ Task 5.2: LangChain/LangGraph integration (optional but recommended)
+    - State machine for pipeline: Retrieve → Recommend → Validate → Audit
+    - Nodes: each component
+    - Edges: conditional routing (e.g., if hallucination detected, flag for review)
+    - Script: src/agent/graph.py
+    - Learning: Graph-based agentic systems, conditional routing
+
+  ✓ Task 5.3: Langfuse instrumentation
+    - Trace every call: retrieval, generation, validation
+    - Track latencies, token counts, costs
+    - Dashboard: pipeline health, error rates, decision distribution
+    - Script: src/instrumentation/langfuse_client.py
+    - Learning: Observability for LLM systems, production monitoring
+
+  ✓ Task 5.4: Integration tests (end-to-end)
+    - E2E test: synthetic query → final recommendation
+    - Verify full trace: retrieved docs → generation → audit logged
+    - Performance test: total latency < 2s (p95)
+    - Script: tests/test_e2e.py
+    - Learning: Integration testing, system-level validation
+
+DELIVERABLES:
+  - EnergyIntelligenceAgent class (fully typed, async)
+  - LangGraph state machine definition (optional but impressive)
+  - Langfuse integration working (traces + dashboard)
+  - Integration test suite covering happy path and edge cases
+
+CHECKPOINT:
+  [ ] Run: python -m pytest tests/test_e2e.py -v --durations=10
+  [ ] Full pipeline latency < 2s (p95)
+  [ ] Langfuse traces appear in dashboard (queries, generations, decisions)
+  [ ] All integration tests pass
+  [ ] Code review: error handling, async patterns, composition design
+
+LEARNING FOCUS:
+  - System orchestration and composition
+  - Conditional routing in agentic systems (LangGraph)
+  - Production observability (tracing, metrics, dashboards)
+  - Integration testing strategies for LLM-based systems
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WEEK 6: Demo + Polish + Documentation
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Goal: Production-ready code, full documentation, compelling demo
+
+CODING TASKS:
+  ✓ Task 6.1: Example queries & live demo
+    - 3–5 realistic dispatch scenarios
+    - Show full trace: query → retrieved docs → recommendation → confidence → audit
+    - Include failure case: hallucination detected and escalated
+    - Script: examples/demo_queries.py
+    - Learning: Narrative design for demos, showing failure modes
+
+  ✓ Task 6.2: Documentation sprint
+    - README.md: architecture diagram, quick start, example usage
+    - ARCHITECTURE.md: RAG pipeline, trade-off decisions, chunking rationale
+    - VECTOR_DB_ANALYSIS.md: pgvector vs alternatives (already started week 2)
+    - SAFETY.md: safety design, responsible AI (already started week 4)
+    - Contributing guidelines for code quality
+    - Script: docs/*.md
+    - Learning: Technical writing, architectural documentation
+
+  ✓ Task 6.3: Code quality pass
+    - Type checking: mypy --strict src/
+    - Linting: ruff check src/ && ruff format src/
+    - Test coverage: coverage run -m pytest && coverage report (target: ≥80%)
+    - Docstring completeness: every function has type hints + docstring
+    - Script: scripts/quality_check.sh
+    - Learning: Code standards, production-grade practices
+
+  ✓ Task 6.4: Deployment & final testing
+    - All tests passing: pytest -v
+    - Docker image builds: docker build -t energy-agent .
+    - Optional: Deploy to cloud (GCP Cloud Run, AWS Lambda, Render)
+    - Final checkpoint: everything in main branch, no TODOs
+    - Script: Dockerfile, .github/workflows/ci.yml
+    - Learning: CI/CD pipelines, Docker containerization
+
+DELIVERABLES:
+  - README.md with architecture diagram (Mermaid or ASCII)
+  - 5 example queries with annotated output (full trace visible)
+  - ARCHITECTURE.md: design decisions, chunking strategy, trade-offs explained
+  - VECTOR_DB_ANALYSIS.md: comparison of vector database options
+  - SAFETY.md: hallucination detection, confidence calibration, audit trail
+  - Passing: mypy --strict, ruff, pytest with ≥80% coverage
+  - Optional: Dockerfile + deployment guide
+
+CHECKPOINT:
+  [ ] pytest -v passes all tests
+  [ ] mypy --strict src/ → no errors
+  [ ] ruff check src/ → no errors
+  [ ] coverage report → ≥80% covered
+  [ ] All 4 documentation files complete and clear
+  [ ] Demo runs cleanly: python examples/demo_queries.py
+  [ ] Code review (final): architecture, safety design, Python patterns
+
+LEARNING FOCUS:
+  - Production code standards (types, tests, documentation)
+  - CI/CD and automated quality checks
+  - Deployment and containerization
+  - Documentation as a critical deliverable
+
+
+═════════════════════════════════════════════════════════════════════════════════
+
+QUALITY GATES (CUMULATIVE):
+─────────────────────────────────────────────────────────────────────────────
+
+Week 1:
+  ✓ Models defined and tested
+  ✓ Docker Compose working locally
+  ✓ Chunking pipeline operational
+  ✓ Learning: Python types, Pydantic, async fundamentals
+
+Week 2:
+  ✓ Retrieval working (BM25 + semantic)
+  ✓ Evaluation framework in place
+  ✓ Proven hybrid > single strategy
+  ✓ Learning: Ranking, async I/O, evaluation methodology
+
+Week 3:
+  ✓ Claude generating recommendations
+  ✓ Hallucination detection working
+  ✓ All recommendation tests passing
+  ✓ Learning: Prompt design, structured output, testing LLMs
+
+Week 4:
+  ✓ Confidence scoring calibrated
+  ✓ Audit trail working
+  ✓ Constraint validation implemented
+  ✓ Safety documentation complete
+  ✓ Learning: Confidence calibration, auditability, compliance
+
+Week 5:
+  ✓ End-to-end pipeline working
+  ✓ Langfuse instrumentation deployed
+  ✓ All integration tests passing
+  ✓ Latency < 2s (p95)
+  ✓ Learning: Orchestration, observability, system thinking
+
+Week 6:
+  ✓ All code passes quality gates (types, lint, tests, coverage)
+  ✓ Documentation complete
+  ✓ Demo is compelling and shows strengths
+  ✓ Learning: Production standards, deployment, technical writing
+
+═════════════════════════════════════════════════════════════════════════════════
+
+INTERVIEW NARRATIVE (post-project):
+
+"I built Energy Intelligence Agent as a production-grade RAG system. Here's why
+each decision mattered:
+
+• RAG over fine-tuning: Regulations change monthly. RAG lets us update docs
+  without retraining. Fine-tuning would lock us in.
+
+• pgvector over Pinecone: I wanted to avoid vendor lock-in and understand the
+  trade-offs. pgvector + PostgreSQL is open-source, portable, and I can optimize
+  the indexing strategy myself.
+
+• Hybrid retrieval: Pure semantic search misses domain terminology in regulations
+  ("peak demand response" isn't captured by embeddings alone). BM25 excels at
+  phrase matching. RRF combines both strategies.
+
+• Confidence scoring: Every recommendation includes a confidence score calibrated
+  on a validation set. If <60%, the system escalates to human review. This is how
+  you build trust in safety-critical systems.
+
+• Audit trail: Every decision is logged with full context. An auditor can trace
+  exactly why a recommendation was made. This matters for regulated domains.
+
+• Python: This was my exercise in production-grade code. Type hints throughout,
+  async/await for I/O, proper error handling, 80%+ test coverage. The code
+  reflects standards I expect at Anthropic.
+
+The most interesting challenge was hallucination detection. Simple approach: check
+if recommendation terms appear in retrieved context. Production approach: semantic
+similarity. I documented both and chose the pragmatic trade-off.
+
+What I learned: RAG is not 'just embeddings' — it's about choosing the right
+retrieval strategy, grounding outputs, and designing for safety from day one."
+
+═════════════════════════════════════════════════════════════════════════════════
+
