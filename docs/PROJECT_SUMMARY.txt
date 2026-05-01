@@ -8,218 +8,145 @@
 THE PROBLEM
 ═══════════════════════════════════════════════════════════════════════════════
 
-Energy dispatch tools must solve a fundamental tension:
+Energy dispatch tools face a fundamental design challenge:
 
-❌ Rigid rule engines: Can't adapt to regulatory changes (require code rewrites)
-❌ Unauditable ML: No way to explain decisions to regulators
-✅ What's needed: Adaptive, auditable, grounded recommendations
+❌ Rigid rule engines: Cannot adapt to regulatory changes without code rewrites
+❌ Unauditable ML systems: Cannot explain decisions to regulators
+✅ Required: Adaptive, auditable, grounded recommendations
 
-The UK energy market's regulations change monthly. Fine-tuning an LLM every 
-month is impractical. The system needs RAG: retrieval of current documents 
+Energy market regulations change monthly. Fine-tuning LLMs monthly is 
+impractical. The system needs RAG: retrieve current regulatory documents 
 to ground recommendations without retraining.
-
-Energy Intelligence Agent replaces rules engines with RAG: instead of IF-THEN 
-logic, it retrieves regulatory documents and lets Claude reason about the best 
-action. When regulations change, add a new document—no code changes needed.
 
 
 ═══════════════════════════════════════════════════════════════════════════════
 THE SOLUTION
 ═══════════════════════════════════════════════════════════════════════════════
 
-Energy Intelligence Agent: A RAG system for energy dispatch with built-in 
-measurement infrastructure for optimization.
+A RAG system that replaces rules engines with document retrieval + LLM reasoning.
 
 ARCHITECTURE:
+
   1. RETRIEVAL LAYER
-     - Hybrid search: BM25 (keyword) + semantic (embeddings) + RRF ranking
-     - Why hybrid? Energy regulations contain specific terminology that pure 
-       semantic search misses (e.g., "demand response", "balancing mechanism")
-     - Why pgvector? Atomic transactions with audit logs, no vendor lock-in, 
-       tunable HNSW indexing
-     - A/B testing framework: Measure BM25 vs semantic vs hybrid performance
+     - Hybrid search: BM25 (keyword) + semantic (embeddings) + RRF
+     - pgvector for vector storage (atomic transactions with audit log)
+     - A/B testing framework to measure retrieval quality
   
   2. GENERATION LAYER
-     - Claude 3.5 Sonnet with structured output (JSON schema)
-     - Grounding: Every recommendation cites the retrieved documents
-     - Single-pass generation (not agentic; multi-step reasoning deferred)
+     - Claude 3.5 Sonnet with structured JSON output
+     - Grounding: every recommendation cites retrieved documents
+     - Single-pass generation (orchestration-ready but not multi-step)
   
   3. SAFETY LAYER
-     - Hallucination detection: Flag if recommendation contradicts context
-     - Confidence scoring: Raw Claude output (infrastructure for calibration)
-     - Audit trail: Immutable log of every decision for compliance
-     - Constraint validation: Validate recommendations against regulations
+     - Hallucination detection: flag contradictions with context
+     - Confidence scoring: raw Claude output with audit logging
+     - Immutable audit trail for regulatory compliance
+     - Constraint validation: check recommendations against extracted rules
 
-TECH STACK:
-  - Python 3.11+ (production-grade, type-safe, mypy --strict)
-  - PostgreSQL 15 + pgvector (vector database, open source, RDS managed)
+TECHNOLOGY:
+  - Python 3.11+ (type-safe, mypy --strict)
+  - PostgreSQL 15 + pgvector (RDS managed)
   - Pydantic v2 (schema validation, immutability)
-  - LangChain (retrieval + generation pipeline)
-  - Claude 3.5 Sonnet (structured output, reasoning)
-  - Langfuse (observability: traces, metrics, audit)
-
-KEY TRADE-OFFS & HONEST ASSESSMENT:
-  - Single-pass generation vs agentic loop
-    Chose: Single-pass (simpler, sufficient)
-    Could add: Agent loop for multi-step refinement
-  
-  - Raw confidence vs calibrated confidence
-    Chose: Infrastructure ready for calibration
-    Could add: Brier score validation on test set
-  
-  - One prompt vs multi-prompt optimization
-    Chose: Time focus over prompt A/B testing
-    Could add: Test 3 prompts (direct, CoT, few-shot)
+  - LangChain (retrieval orchestration)
+  - Claude 4.5 Sonnet (structured output, improved reasoning)
+  - Langfuse (observability: traces, metrics)
 
 
 ═══════════════════════════════════════════════════════════════════════════════
-═══════════════════════════════════════════════════════════════════════════════
-OUTCOMES & HONEST ASSESSMENT
-═══════════════════════════════════════════════════════════════════════════════
-
-By July 15, 2026:
-
-CODE QUALITY:
-  ✓ 4,000+ lines of typed, tested Python (mypy --strict passes)
-  ✓ 80%+ test coverage
-  ✓ Production-ready patterns (async, error handling, logging)
-
-RETRIEVAL (MEASURED & OPTIMIZED):
-  ✓ A/B tested: BM25 vs semantic vs hybrid
-  ✓ Results documented: Hybrid outperforms pure semantic
-  ✓ Latency <500ms (p95)
-  ✓ Chunking strategy evaluated (semantic wins over fixed-size)
-
-GENERATION (SINGLE-PASS, NOT OPTIMIZED):
-  ✓ Claude integration with structured output working
-  ✓ Grounding enforced (every output cites documents)
-  ⚠ Single-pass only (not multi-prompt A/B tested)
-  ⚠ No chain-of-thought optimization
-
-SAFETY (BASELINE, INFRASTRUCTURE FOR OPTIMIZATION):
-  ✓ Hallucination detection: term-overlap based
-  ✓ Audit trail: immutable and complete
-  ✓ Constraint validation: working
-  ⚠ Confidence scoring: raw Claude output (NOT calibrated with Brier score)
-  ⚠ Infrastructure exists for calibration but not implemented
-
-OBSERVABILITY:
-  ✓ Langfuse instrumentation complete
-  ✓ Full traces visible (retrieval → generation → audit)
-  ✓ Pipeline metrics tracked
-
-DEMO:
-  ✓ 5 live example queries working
-  ✓ Full visible traces for each query
-
-DOCUMENTATION:
-  ✓ README.md (quick start, architecture, limitations)
-  ✓ ARCHITECTURE.md (design decisions, trade-offs, what wasn't optimized)
-  ✓ SAFETY.md (responsible AI mechanisms)
-  ✓ VECTOR_DB_ANALYSIS.md (why pgvector)
-  ✓ CHUNKING_STRATEGY.md (why semantic chunking)
-
-WHAT ACTUALLY GOT OPTIMIZED:
-  ✓ Retrieval strategy (A/B tested, measured, winner selected)
-  ✓ Chunking approach (tested 3 strategies, best chosen)
-
-WHAT'S INFRASTRUCTURE (READY FOR OPTIMIZATION IF TIME PERMITS):
-  ⚠ Confidence calibration (could add Brier score validation)
-  ⚠ Prompt optimization (could test 3 templates)
-  ⚠ Generation strategy (could add agent loop for refinement)
-  ⚠ Multi-step reasoning (agentic architecture in place, not used)
-
-
-═══════════════════════════════════════════════════════════════════════════════
-KEY ARCHITECTURE DECISIONS (& What They Cost)
+KEY DESIGN DECISIONS
 ═══════════════════════════════════════════════════════════════════════════════
 
 1. HYBRID RETRIEVAL (not pure semantic)
-   Why: Energy domain has specific terminology. Pure semantic search fails on 
-   exact phrases like "demand response" or "balancing mechanism". BM25 catches 
-   keywords; semantic catches intent. RRF combines both.
-   
-   Evidence: A/B test on eval set shows hybrid > pure semantic 
-   (Precision@5: 0.78 vs 0.58)
-   
-   Status: OPTIMIZED ✓
+   Rationale: Energy domain contains domain-specific terminology that pure 
+   semantic search misses. BM25 captures exact matches; semantic captures intent.
+   Trade-off: Single approach simplicity vs measurement complexity
 
 2. pgvector (not Pinecone/Chroma)
-   Why: Need atomic transactions between audit trail and vector operations. 
-   When a decision is logged, retrieval events and recommendation must be in 
-   the same transaction. pgvector + PostgreSQL enables this. Pinecone cannot.
-   
-   Trade-off: Open source flexibility vs managed service convenience
-   
-   Status: DECISION MADE, not fully optimized
+   Rationale: Atomic transactions between retrieval and audit data in same DB.
+   Trade-off: Open source operational complexity vs vendor lock-in
 
 3. Single-Pass Generation (not agentic loop)
-   Why: Simpler architecture, sufficient for the problem, time constraints
-   
-   What you're NOT doing: 
-   - Multi-step reasoning with Claude
-   - Agent loop for refinement based on feedback
-   - Trying multiple generation strategies
-   
-   Could improve: Agent-based refinement could reduce hallucinations
-   
-   Status: ARCHITECTURAL CHOICE, infrastructure for agents exists but unused
+   Rationale: Simplicity sufficient. Validation catches unsafe outputs.
+   Trade-off: Single path simplicity vs multi-step refinement capability
 
 4. Raw Confidence Scoring (not calibrated)
-   Why: Time constraints. Raw Claude output is available immediately.
-   
-   What you're NOT doing:
-   - Measuring Brier score on validation set
-   - Calibrating scores (scaling raw outputs up/down)
-   - Validating that 80% confidence = 80% accurate
-   
-   Could improve: Calibration would ensure confidence matches reality
-   
-   Status: INFRASTRUCTURE READY, optimization deferred
+   Rationale: Claude output usable immediately. Infrastructure for calibration 
+   in place if needed post-deployment.
+   Trade-off: Speed to deployment vs confidence validity measurement
 
-5. One Generation Prompt (not multi-prompt optimized)
-   Why: Time focus. One well-crafted prompt > untested variants
-   
-   What you're NOT doing:
-   - A/B testing direct vs chain-of-thought vs few-shot prompts
-   - Measuring which prompt style produces best recommendations
-   - Optimizing prompt wording based on results
-   
-   Could improve: Multi-prompt A/B testing could improve recommendation quality
-   
-   Status: INFRASTRUCTURE READY, optimization deferred
+5. Structured Output Validation (safety-critical)
+   Rationale: Pydantic v2 ensures well-formed recommendations before Claude.
+   Trade-off: Strict schema enforcement vs flexibility
+
 
 ═══════════════════════════════════════════════════════════════════════════════
-HONEST SUMMARY
+DELIVERABLES
 ═══════════════════════════════════════════════════════════════════════════════
 
-This is a WELL-DESIGNED system with OPTIMIZED RETRIEVAL and SAFETY 
-INFRASTRUCTURE. It is NOT a fully optimized system across all layers.
+CODE:
+  - src/models.py (Pydantic v2 schemas)
+  - src/retriever/ (BM25, semantic, hybrid implementations)
+  - src/recommendation_engine/ (Claude integration, grounding)
+  - src/safety/ (hallucination detection, constraint validation)
+  - src/audit/ (immutable audit trail)
+  - src/agent/ (orchestration)
+  - tests/ (unit, integration, end-to-end)
 
-What's genuinely optimized:
-  ✓ Retrieval strategy (measured, tested, best chosen)
-  ✓ Chunking approach (tested 3 strategies)
-  ✓ Architecture (clean, type-safe, testable)
+DATA INFRASTRUCTURE:
+  - RDS PostgreSQL 15 with pgvector extension
+  - Synthetic dataset (~100 documents)
+  - pgvector HNSW indexes
 
-What's production-grade but not optimized:
-  ⚠ Generation quality (one prompt, not A/B tested)
-  ⚠ Confidence calibration (raw scores, not validated)
-  ⚠ Multi-step reasoning (infrastructure exists, not used)
+DOCUMENTATION:
+  - README.md (quick start, architecture overview)
+  - ARCHITECTURE.md (design decisions and rationale)
+  - SAFETY.md (responsible AI mechanisms)
+  - VECTOR_DB_ANALYSIS.md (pgvector vs alternatives)
+  - CHUNKING_STRATEGY.md (chunking approach justification)
 
-Why you made these choices:
-  - Time constraints (6 weeks, not 12)
-  - Clarity over complexity (one path, not three competing paths)
-  - Infrastructure-first approach (build foundation for future optimization)
+OBSERVABILITY:
+  - Langfuse instrumentation (traces, metrics)
+  - Live demo (5 example queries with visible traces)
 
-Interview answer if asked:
-  "I optimized retrieval with A/B testing and chunking strategy selection. 
-   The generation and confidence scoring layers are well-designed but not fully 
-   optimized—infrastructure is ready, but I focused time on retrieval given the 
-   timeline. If quality issues emerged, I'd add prompt A/B testing and 
-   confidence calibration as next steps."
-
-
+TESTING:
+  - Unit tests for each component
+  - Integration tests for pipeline
+  - End-to-end tests with synthetic queries
+  - A/B test framework for retrieval evaluation
 
 
+═══════════════════════════════════════════════════════════════════════════════
+MEASUREMENT POINTS
+═══════════════════════════════════════════════════════════════════════════════
+
+Retrieval Quality:
+  - A/B test: BM25 vs semantic vs hybrid
+  - Metric: Precision@5 on evaluation set
+
+Generation Quality:
+  - All outputs properly grounded (cite sources)
+  - Structured output validation
+
+Safety:
+  - Hallucination detection catches contradictions
+  - Audit trail complete and immutable
+  - Constraint validation working
+
+Performance:
+  - Retrieval + generation latency <2s (p95)
+  - Code: mypy --strict, 80%+ coverage
+
+
+═══════════════════════════════════════════════════════════════════════════════
+WHAT THIS SYSTEM DOES NOT INCLUDE
+═══════════════════════════════════════════════════════════════════════════════
+
+- Multi-step agentic reasoning (infrastructure ready, not implemented)
+- Confidence score calibration via Brier score validation
+- Prompt optimization via A/B testing multiple templates
+- Fine-tuning on domain-specific data
+- Real-time model retraining
+
+These are deferred for post-deployment phases or if time permits.
 
 ═══════════════════════════════════════════════════════════════════════════════
