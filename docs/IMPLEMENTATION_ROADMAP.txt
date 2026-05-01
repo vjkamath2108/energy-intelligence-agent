@@ -8,14 +8,16 @@
 WEEK 1: Setup + Data Pipeline Foundation
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Goal: pgvector + PostgreSQL running with synthetic energy data loaded
+Goal: RDS PostgreSQL 15 + pgvector running with synthetic energy data loaded
 
 CODING TASKS:
-  ✓ Task 1.1: Docker Compose setup
-    - PostgreSQL 15 with pgvector extension
-    - Hot reload for local development
-    - Script: infrastructure/docker-compose.yml
-    - Learning: Infrastructure as code, Docker networking
+  ✓ Task 1.1: RDS PostgreSQL setup
+    - AWS Console: Create RDS instance (PostgreSQL 15, db.t3.micro)
+    - Enable pgvector extension: CREATE EXTENSION vector;
+    - Security group: Allow inbound on port 5432 from your IP
+    - Connection: Test with psql, store credentials in .env
+    - Script: src/db.py (connection module)
+    - Learning: AWS RDS management, connection pooling, credential handling
   
   ✓ Task 1.2: Data models (Pydantic v2)
     - RetrievedDocument, DispatchRecommendation, AuditLogEntry
@@ -32,21 +34,28 @@ CODING TASKS:
     - Learning: LLM-friendly chunking, document structure preservation
 
 DELIVERABLES:
-  - Docker Compose file (verify: docker-compose up, database accessible)
+  - RDS PostgreSQL 15 instance running + pgvector extension enabled
+  - .env file with database credentials (DO NOT COMMIT)
+  - src/db.py connection module (tested with RDS endpoint)
   - 3 Pydantic model files with docstrings and validation rules
   - Chunking pipeline with A/B test framework (compare 3 strategies)
   - Synthetic dataset: ~100 documents (regulations, customer data, market data)
 
 CHECKPOINT:
-  [ ] Run: docker-compose up && python -m pytest tests/test_models.py -v
-  [ ] All tests pass
+  [ ] RDS instance created and running
+  [ ] psql connection successful: psql -h <endpoint> -U energy_user -d energy_db
+  [ ] pgvector extension enabled: SELECT * FROM pg_extension WHERE extname='vector';
+  [ ] src/db.py tests pass
+  [ ] python -m pytest tests/test_models.py -v (all tests pass)
   [ ] Can instantiate models, validate data types
   [ ] Chunking metrics: avg chunk size, max chunk size, overlap %
+  [ ] Synthetic data loaded into RDS (~100 documents)
 
 LEARNING FOCUS:
   - Type hints depth: generics, Protocols, TypedDict
   - Pydantic v2 syntax (BaseModel, ConfigDict, Field)
-  - Async context patterns (asyncio setup, no blocking calls)
+  - AWS RDS management and connection handling
+  - Environment variable management (.env, not hardcoding)
 
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
