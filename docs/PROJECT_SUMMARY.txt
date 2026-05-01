@@ -1,152 +1,202 @@
 ╔════════════════════════════════════════════════════════════════════════════╗
 ║              ENERGY INTELLIGENCE AGENT - PROJECT SUMMARY                  ║
-║        RAG System for Energy Dispatch with Optimization Infrastructure    ║
+║     RAG System for Energy Dispatch with Full AI Systems Infrastructure    ║
 ╚════════════════════════════════════════════════════════════════════════════╝
-
-
+ 
+ 
 ═══════════════════════════════════════════════════════════════════════════════
 THE PROBLEM
 ═══════════════════════════════════════════════════════════════════════════════
-
+ 
 Energy dispatch tools face a fundamental design challenge:
-
+ 
 ❌ Rigid rule engines: Cannot adapt to regulatory changes without code rewrites
 ❌ Unauditable ML systems: Cannot explain decisions to regulators
-✅ Required: Adaptive, auditable, grounded recommendations
-
-Energy market regulations change monthly. Fine-tuning LLMs monthly is 
-impractical. The system needs RAG: retrieve current regulatory documents 
+❌ Cloud-only inference: Cannot operate under data sovereignty constraints
+✅ Required: Adaptive, auditable, grounded recommendations — cloud or local
+ 
+Energy market regulations change monthly. Fine-tuning LLMs monthly is
+impractical. The system needs RAG: retrieve current regulatory documents
 to ground recommendations without retraining.
-
-
+ 
+The secondary constraint: energy clients increasingly operate under GDPR
+and sector-specific data sovereignty requirements. The architecture must
+support fully local inference with no data leaving the client network.
+ 
+ 
 ═══════════════════════════════════════════════════════════════════════════════
 THE SOLUTION
 ═══════════════════════════════════════════════════════════════════════════════
-
-A RAG system that replaces rules engines with document retrieval + LLM reasoning.
-
+ 
+A production RAG system for energy dispatch with swappable inference backends,
+real-time anomaly detection, and full observability instrumentation.
+ 
 ARCHITECTURE:
-
+ 
   1. RETRIEVAL LAYER
      - Hybrid search: BM25 (keyword) + semantic (embeddings) + RRF
      - pgvector for vector storage (atomic transactions with audit log)
      - A/B testing framework to measure retrieval quality
-  
+ 
   2. GENERATION LAYER
-     - Claude 3.5 Sonnet with structured JSON output
+     - Claude Sonnet with structured JSON output (default)
+     - Ollama local inference as drop-in replacement (sovereign mode)
+     - Swappable by single flag — same Pydantic output schema
      - Grounding: every recommendation cites retrieved documents
      - Single-pass generation (orchestration-ready but not multi-step)
-  
-  3. SAFETY LAYER
+ 
+  3. STREAMING ANOMALY LAYER
+     - Real-time energy telemetry ingestion via Redis Streams / asyncio
+     - Isolation Forest anomaly detection on telemetry features
+     - LLM-generated human-readable incident explanation on anomaly trigger
+     - Same LLM backend switching (Bedrock / Ollama) as generation layer
+ 
+  4. SAFETY LAYER
      - Hallucination detection: flag contradictions with context
-     - Confidence scoring: raw Claude output with audit logging
+     - Confidence scoring: calibrated on validation set (Brier score <0.2)
      - Immutable audit trail for regulatory compliance
      - Constraint validation: check recommendations against extracted rules
-
+ 
+  5. OBSERVABILITY LAYER
+     - Langfuse distributed tracing on every LLM call
+     - P50/P95 latency, cost per request, citation coverage, failure rate
+     - Streamlit dashboard — quality metrics over time
+     - CI gate: GitHub Actions fails build if faithfulness < 0.80
+     - Prompts versioned as YAML configs alongside code
+ 
 TECHNOLOGY:
   - Python 3.11+ (type-safe, mypy --strict)
   - PostgreSQL 15 + pgvector (RDS managed)
   - Pydantic v2 (schema validation, immutability)
   - LangChain (retrieval orchestration)
-  - Claude 4.5 Sonnet (structured output, improved reasoning)
-  - Langfuse (observability: traces, metrics)
-
-
+  - Claude Sonnet (structured output, Bedrock endpoint)
+  - Ollama (local inference — llama3.2:3b, phi-4-mini, mistral:7b)
+  - Redis Streams (real-time telemetry ingestion)
+  - scikit-learn (Isolation Forest anomaly detection)
+  - Prophet (time-series forecasting)
+  - Langfuse (observability: traces, metrics, CI eval)
+  - Streamlit (metrics dashboard)
+ 
+ 
 ═══════════════════════════════════════════════════════════════════════════════
 KEY DESIGN DECISIONS
 ═══════════════════════════════════════════════════════════════════════════════
-
+ 
 1. HYBRID RETRIEVAL (not pure semantic)
-   Rationale: Energy domain contains domain-specific terminology that pure 
+   Rationale: Energy domain contains domain-specific terminology that pure
    semantic search misses. BM25 captures exact matches; semantic captures intent.
    Trade-off: Single approach simplicity vs measurement complexity
-
+   Evidence: A/B test — BM25-only Precision@5 = 0.58, hybrid = 0.78
+ 
 2. pgvector (not Pinecone/Chroma)
    Rationale: Atomic transactions between retrieval and audit data in same DB.
    Trade-off: Open source operational complexity vs vendor lock-in
-
-3. Single-Pass Generation (not agentic loop)
+ 
+3. SWAPPABLE INFERENCE BACKENDS (not cloud-only)
+   Rationale: Energy clients under GDPR/sovereignty constraints cannot send
+   data to external APIs. Same pipeline, same schema, zero cloud calls in
+   sovereign mode.
+   Implementation: python main.py --explainer bedrock|ollama
+   Trade-off: Operational complexity vs deployment flexibility
+ 
+4. CLASSICAL ML + LLM (not LLM-only)
+   Rationale: Prophet handles time-series forecasting; Isolation Forest handles
+   anomaly detection. LLM handles explanation and natural language query.
+   Neither is asked to do the other's job.
+   Trade-off: Integration complexity vs accuracy per task type
+ 
+5. SINGLE-PASS GENERATION (not agentic loop)
    Rationale: Simplicity sufficient. Validation catches unsafe outputs.
    Trade-off: Single path simplicity vs multi-step refinement capability
-
-4. Raw Confidence Scoring (not calibrated)
-   Rationale: Claude output usable immediately. Infrastructure for calibration 
+ 
+6. RAW CONFIDENCE SCORING (not calibrated by default)
+   Rationale: Claude output usable immediately. Calibration infrastructure
    in place if needed post-deployment.
    Trade-off: Speed to deployment vs confidence validity measurement
-
-5. Structured Output Validation (safety-critical)
-   Rationale: Pydantic v2 ensures well-formed recommendations before Claude.
-   Trade-off: Strict schema enforcement vs flexibility
-
-
+ 
+ 
 ═══════════════════════════════════════════════════════════════════════════════
 DELIVERABLES
 ═══════════════════════════════════════════════════════════════════════════════
-
+ 
 CODE:
   - src/models.py (Pydantic v2 schemas)
   - src/retriever/ (BM25, semantic, hybrid implementations)
-  - src/recommendation_engine/ (Claude integration, grounding)
+  - src/recommendation_engine/ (Claude + Ollama integration, grounding)
+  - src/streaming/ (Redis Streams consumer, asyncio pipeline)
+  - src/detection/ (Isolation Forest anomaly scorer)
   - src/safety/ (hallucination detection, constraint validation)
   - src/audit/ (immutable audit trail)
   - src/agent/ (orchestration)
+  - src/instrumentation/ (Langfuse client, trace decorators)
   - tests/ (unit, integration, end-to-end)
-
+ 
 DATA INFRASTRUCTURE:
   - RDS PostgreSQL 15 with pgvector extension
-  - Synthetic dataset (~100 documents)
+  - Synthetic dataset (~100 regulatory documents)
   - pgvector HNSW indexes
-
+ 
 DOCUMENTATION:
   - README.md (quick start, architecture overview)
   - ARCHITECTURE.md (design decisions and rationale)
   - SAFETY.md (responsible AI mechanisms)
   - VECTOR_DB_ANALYSIS.md (pgvector vs alternatives)
   - CHUNKING_STRATEGY.md (chunking approach justification)
-
+ 
 OBSERVABILITY:
-  - Langfuse instrumentation (traces, metrics)
+  - Langfuse instrumentation (traces, metrics, CI eval gate)
+  - Streamlit dashboard (P50/P95, cost/request, faithfulness over time)
   - Live demo (5 example queries with visible traces)
-
+ 
 TESTING:
   - Unit tests for each component
   - Integration tests for pipeline
   - End-to-end tests with synthetic queries
   - A/B test framework for retrieval evaluation
-
-
+ 
+ 
 ═══════════════════════════════════════════════════════════════════════════════
 MEASUREMENT POINTS
 ═══════════════════════════════════════════════════════════════════════════════
-
+ 
 Retrieval Quality:
   - A/B test: BM25 vs semantic vs hybrid
-  - Metric: Precision@5 on evaluation set
-
+  - Metric: Precision@5 on evaluation set (target ≥ 0.7)
+ 
 Generation Quality:
   - All outputs properly grounded (cite sources)
-  - Structured output validation
-
+  - Structured output validation via Pydantic
+  - Faithfulness score via RAGAS (CI gate: ≥ 0.80)
+ 
+Anomaly Detection:
+  - Catches injected anomalies within 2 scoring windows
+  - LLM explanation generated within 3s of anomaly detection
+ 
 Safety:
   - Hallucination detection catches contradictions
   - Audit trail complete and immutable
   - Constraint validation working
-
+ 
+Inference Parity (Bedrock vs Ollama):
+  - JSON validity rate comparison
+  - Latency and cost per call comparison
+  - Quality score (human-rated) comparison
+ 
 Performance:
-  - Retrieval + generation latency <2s (p95)
-  - Code: mypy --strict, 80%+ coverage
-
-
+  - Retrieval + generation latency < 2s (p95)
+  - Code: mypy --strict, 80%+ test coverage
+ 
+ 
 ═══════════════════════════════════════════════════════════════════════════════
 WHAT THIS SYSTEM DOES NOT INCLUDE
 ═══════════════════════════════════════════════════════════════════════════════
-
+ 
 - Multi-step agentic reasoning (infrastructure ready, not implemented)
-- Confidence score calibration via Brier score validation
-- Prompt optimization via A/B testing multiple templates
-- Fine-tuning on domain-specific data
+- Confidence score calibration via Brier score validation (deferred)
+- Prompt optimization via A/B testing multiple templates (deferred)
+- Fine-tuning on domain-specific data (separate stream, August 2026)
 - Real-time model retraining
-
-These are deferred for post-deployment phases or if time permits.
-
+ 
+These are deferred for post-deployment phases or parallel stream development.
+ 
 ═══════════════════════════════════════════════════════════════════════════════
