@@ -46,10 +46,10 @@ energy-intelligence-agent/
 **Current sprint: Stream 1, Sprint 0 — gate Wednesday 6 May 2026**
 
 - [x] S1.0.1 — Synthetic log generator (`stream1_log_anomaly/src/streaming/generate_logs.py`)
-- [ ] S1.0.2 — asyncio file tail consumer (`stream1_log_anomaly/src/streaming/tail_consumer.py`)
-- [ ] S1.0.3 — Isolation Forest anomaly scorer (`stream1_log_anomaly/src/detection/anomaly_scorer.py`)
-- [ ] S1.0.4 — Bedrock explainer (`stream1_log_anomaly/src/explanation/bedrock_explainer.py`)
-- [ ] S1.0.5 — Wire together in `stream1_log_anomaly/main.py`
+- [x] S1.0.2 — asyncio file tail consumer (`stream1_log_anomaly/src/streaming/tail_consumer.py`)
+- [x] S1.0.3 — Isolation Forest anomaly scorer (`stream1_log_anomaly/src/detection/anomaly_scorer.py`)
+- [x] S1.0.4 — Bedrock explainer (`stream1_log_anomaly/src/explanation/bedrock_explainer.py`)
+- [x] S1.0.5 — Wire together in `stream1_log_anomaly/main.py`
 
 Update checkboxes as tasks complete.
 
