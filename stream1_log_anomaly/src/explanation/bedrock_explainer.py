@@ -17,14 +17,21 @@ import logging
 import time
 from typing import Any
 
+import os
 import boto3
 from botocore.exceptions import ClientError
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 logger = logging.getLogger(__name__)
 
-BEDROCK_MODEL_ID = "anthropic.claude-sonnet-4-5"
-BEDROCK_REGION = "eu-west-2"
+
+# us-west-2 requires regional inference profile prefix.
+# Raw model IDs (anthropic.claude-*) are rejected — use us.* prefix.
+# Full versioned IDs required — short aliases don't work with invoke_model.
+# BEDROCK_MODEL_ID = "us.anthropic.claude-opus-4-5-20251101-v1:0"
+BEDROCK_MODEL_ID = os.getenv("BEDROCK_MODEL_ID","us.anthropic.claude-opus-4-5-20251101-v1:0")
+
+BEDROCK_REGION = "us-west-2"
 MAX_RETRIES = 3
 BASE_BACKOFF = 1.0
 
