@@ -1,0 +1,15 @@
+---
+name: explain-code
+description: Explains code with visual diagrams and analogies. Use when explaining how code works, teaching about a codebase, or when the user asks "how does this work?" or "explain this".
+---
+
+When explaining code, always follow this structure:
+
+1. **Start with an analogy**: Compare the code to something from everyday life
+2. **Draw a diagram**: Use ASCII art to show flow, structure, or relationships — only if the code has non-obvious structure (skip for simple functions)
+3. **Walk through the code**: Explain step by step what happens, in plain English
+4. **Highlight a gotcha**: What is a common mistake or misconception with this pattern?
+
+If there are dependent concepts the user would need to understand fully, name them explicitly and encourage separate queries — do not explain everything inline.
+
+Keep explanations conversational and jargon-free. For complex concepts, use multiple analogies before technical terms.
