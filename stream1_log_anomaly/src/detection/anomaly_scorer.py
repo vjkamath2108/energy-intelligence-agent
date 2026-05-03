@@ -76,8 +76,8 @@ class AnomalyScorer:
         """
         return [
             float(event.latency_ms),
-            1.0 if event.get("level") == "ERROR" else 0.0,
-            1.0 if int(event.get("status_code", 200)) >= 500 else 0.0,
+            1.0 if event.level == "ERROR" else 0.0,
+            1.0 if int(event.status_code) >= 500 else 0.0,
         ]
 
     def _fit(self) -> None:
@@ -137,9 +137,9 @@ class AnomalyScorer:
         if is_anomaly:
             logger.warning(
                 "ANOMALY detected | service=%s level=%s latency=%sms score=%.4f",
-                event.get("service"),
-                event.get("level"),
-                event.get("latency_ms"),
+                event.service,
+                event.level,
+                event.latency_ms,
                 raw_score,
             )
 
