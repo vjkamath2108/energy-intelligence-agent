@@ -41,10 +41,10 @@ logger = logging.getLogger(__name__)
 DEFAULT_LOG_FILE = Path("stream1_log_anomaly/logs/sample.jsonl")
 
 
-def _print_explanation(event: dict, explanation: Explanation, event_index: int) -> None:
+def _print_explanation(event: LogEvent, explanation: Explanation, event_index: int) -> None:
     """Print a formatted anomaly explanation to stdout."""
     print(f"\n{'='*60}")
-    print(f"🚨 ANOMALY [{event_index:03d}] — {event.get('service')} | {event.get('level')} | {event.get('latency_ms')}ms")
+    print(f"🚨 ANOMALY [{event_index:03d}] — {event.service} | {event.level} | {event.latency_ms}ms")
     print(f"{'='*60}")
     print(f"Severity:  {explanation.severity}")
     print(f"Summary:   {explanation.summary}")

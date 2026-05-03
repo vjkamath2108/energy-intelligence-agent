@@ -232,7 +232,7 @@ if __name__ == "__main__":
         context = events[max(0, i - 5) : i + 6]
 
         print(f"\n{'='*60}")
-        print(f"ANOMALY at event [{i:03d}] — {event.get('service')} {event.get('level')}")
+        print(f"ANOMALY at event [{i:03d}] — {event.service} {event.level}")
         print(f"{'='*60}")
 
         explanation = explainer.explain(event, context)
