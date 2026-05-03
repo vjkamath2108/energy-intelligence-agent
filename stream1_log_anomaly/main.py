@@ -23,6 +23,8 @@ import os
 from pathlib import Path
 
 from dotenv import load_dotenv
+from stream1_log_anomaly.src.models import LogEvent
+
 
 from stream1_log_anomaly.src.streaming.tail_consumer import tail_file, consume_queue
 from stream1_log_anomaly.src.detection.anomaly_scorer import AnomalyScorer
@@ -52,7 +54,7 @@ def _print_explanation(event: dict, explanation: Explanation, event_index: int) 
 
 
 async def pipeline(
-    queue: asyncio.Queue[dict],
+    queue: asyncio.Queue[LogEvent],
     explainer: BedrockExplainer,
     stop_event: asyncio.Event,
 ) -> None:
@@ -68,7 +70,7 @@ async def pipeline(
         stop_event: Signals pipeline to exit after draining queue.
     """
     scorer = AnomalyScorer()
-    recent_events: list[dict] = []   # rolling window for ±5 context
+    recent_events: list[LogEvent] = []   # rolling window for ±5 context
     event_index = 0
     anomalies_found = 0
 
@@ -129,7 +131,7 @@ async def main(log_file: Path, explainer_backend: str) -> None:
 
     explainer = BedrockExplainer(region=os.getenv("AWS_REGION", "eu-west-2"))
 
-    queue: asyncio.Queue[dict] = asyncio.Queue()
+    queue: asyncio.Queue[LogEvent] = asyncio.Queue()
     stop_event = asyncio.Event()
 
     logger.info("Starting pipeline — log file: %s, explainer: %s", log_file, explainer_backend)

@@ -15,6 +15,7 @@ import json
 import logging
 from pathlib import Path
 from typing import AsyncIterator
+from stream1_log_anomaly.src.models import LogEvent
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +49,8 @@ async def tail_file(
                 line = line.strip()
                 if line:  # skip blank lines
                     try:
-                        event = json.loads(line)
+                        #event = json.loads(line) - commented out to use pydantic model instead in sprint 1
+                        event = LogEvent(**json.loads(line))
                         await queue.put(event)
                     except json.JSONDecodeError:
                         logger.warning("Skipping malformed line: %s", line[:120])

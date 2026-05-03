@@ -20,6 +20,8 @@ from dataclasses import dataclass, field
 
 from sklearn.ensemble import IsolationForest  # type: ignore[import]
 import numpy as np
+from stream1_log_anomaly.src.models import LogEvent
+
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +64,8 @@ class AnomalyScorer:
     _model: IsolationForest | None = field(default=None, repr=False)
     _window_id: int = field(default=0, repr=False)
 
-    def _extract_features(self, event: dict) -> list[float]:
+    #
+    def _extract_features(self, event: LogEvent) -> list[float]:
         """
         Extract numeric feature vector from a log event.
 
@@ -72,7 +75,7 @@ class AnomalyScorer:
             is_500: 1.0 if status_code >= 500, else 0.0.
         """
         return [
-            float(event.get("latency_ms", 0)),
+            float(event.latency_ms),
             1.0 if event.get("level") == "ERROR" else 0.0,
             1.0 if int(event.get("status_code", 200)) >= 500 else 0.0,
         ]
@@ -92,7 +95,7 @@ class AnomalyScorer:
             self._window_id,
         )
 
-    def score(self, event: dict) -> AnomalyResult | None:
+    def score(self, event: LogEvent) -> AnomalyResult | None:
         """
         Score a single log event.
 

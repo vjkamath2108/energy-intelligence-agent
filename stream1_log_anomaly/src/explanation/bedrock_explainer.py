@@ -21,6 +21,8 @@ import os
 import boto3
 from botocore.exceptions import ClientError
 from pydantic import BaseModel, ConfigDict, ValidationError
+from stream1_log_anomaly.src.models import LogEvent
+
 
 logger = logging.getLogger(__name__)
 
@@ -66,8 +68,8 @@ def _build_prompt(
         anomalous_event: The event flagged as anomalous by Isolation Forest.
         context_events: Surrounding ±5 events for causality context.
     """
-    context_str = json.dumps(context_events, indent=2)
-    event_str = json.dumps(anomalous_event, indent=2)
+    context_str = json.dumps([e.model_dump() for e in context_events], indent=2)
+    event_str = json.dumps(anomalous_event.model_dump(), indent=2)
 
     return f"""You are an expert site reliability engineer analysing log anomalies.
 
