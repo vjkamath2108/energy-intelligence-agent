@@ -79,7 +79,8 @@ Surrounding context events (±5 around the anomaly):
 Anomalous event flagged by Isolation Forest:
 {event_str}
 
-Respond ONLY with a JSON object. No preamble, no markdown, no explanation outside the JSON.
+Respond ONLY with a JSON object. No preamble, no markdown, no explanation outside the JSON.Do not use markdown code fences. Do not write ```json.
+Start your response with {{ and end with }}.
 
 {{
   "severity": "<HIGH|MEDIUM|LOW>",
@@ -138,20 +139,16 @@ def _call_bedrock(client: Any, prompt: str) -> str:
 
 
 def _parse_explanation(raw_text: str) -> Explanation:
-    """
-    Parse and validate Claude's JSON response into an Explanation.
-
-    Args:
-        raw_text: Raw text from Claude — should be a JSON object.
-
-    Returns:
-        Validated Explanation instance.
-
-    Raises:
-        ValueError: If JSON is invalid or schema validation fails.
-    """
+    clean = raw_text.strip()
+    if clean.startswith("```"):
+        # Strip opening fence (```json or ```)
+        clean = clean.split("\n", 1)[1]
+    if clean.endswith("```"):
+        clean = clean.rsplit("```", 1)[0]
+    clean = clean.strip()
+    
     try:
-        data = json.loads(raw_text.strip())
+        data = json.loads(clean)
         return Explanation(**data)
     except (json.JSONDecodeError, ValidationError) as e:
         raise ValueError(f"Failed to parse explanation: {e}\nRaw: {raw_text}") from e
