@@ -254,4 +254,4 @@ if __name__ == "__main__":
             print(f"Cause:     {explanation.likely_cause}")
             print(f"Action:    {explanation.recommended_action}")
 
-        asyncio.run(_smoke_test())
+    asyncio.run(_smoke_test())
