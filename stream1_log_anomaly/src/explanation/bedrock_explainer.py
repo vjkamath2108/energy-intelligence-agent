@@ -16,6 +16,7 @@ import json
 import logging
 import time
 from typing import Any
+import asyncio
 
 import os
 import boto3
@@ -89,8 +90,18 @@ Start your response with {{ and end with }}.
   "recommended_action": "<what an engineer should do next>"
 }}"""
 
+async def _call_bedrock(client: Any, prompt: str) -> str:
+    """
+    Async wrapper around _call_bedrock_sync.
+    Runs the blocking boto3 call in a thread pool executor so it does
+    not block the asyncio event loop during Bedrock latency (typically 2-3s).
+    """
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, _call_bedrock_sync, client, prompt)
 
-def _call_bedrock(client: Any, prompt: str) -> str:
+
+
+def _call_bedrock_sync(client: Any, prompt: str) -> str:
     """
     Call Bedrock Claude and return the raw text response.
 
@@ -172,7 +183,7 @@ class BedrockExplainer:
             region_name=region,
         )
 
-    def explain(
+    async def explain(
         self,
         anomalous_event: LogEvent,
         context_events: list[LogEvent],
@@ -194,7 +205,7 @@ class BedrockExplainer:
         """
         prompt = _build_prompt(anomalous_event, context_events)
 
-        raw = _call_bedrock(self._client, prompt)
+        raw = await _call_bedrock(self._client, prompt)
         logger.debug("Bedrock raw response: %s", raw[:200])
 
         try:
@@ -212,13 +223,14 @@ if __name__ == "__main__":
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 
-    events = [
-        LogEvent(**json.loads(line))
-        for line in Path("stream1_log_anomaly/logs/sample.jsonl")
-        .read_text()
-        .splitlines()
-        if line.strip()
-    ]
+    async def _smoke_test()-> None:
+        events = [
+            LogEvent(**json.loads(line))
+            for line in Path("stream1_log_anomaly/logs/sample.jsonl")
+            .read_text()
+            .splitlines()
+            if line.strip()
+        ]
 
     scorer = AnomalyScorer()
     explainer = BedrockExplainer()
@@ -235,9 +247,11 @@ if __name__ == "__main__":
         print(f"ANOMALY at event [{i:03d}] — {event.service} {event.level}")
         print(f"{'='*60}")
 
-        explanation = explainer.explain(event, context)
+        explanation = await explainer.explain(event, context)
 
         print(f"Severity:  {explanation.severity}")
         print(f"Summary:   {explanation.summary}")
         print(f"Cause:     {explanation.likely_cause}")
         print(f"Action:    {explanation.recommended_action}")
+
+    asyncio.run(_smoke_test())
