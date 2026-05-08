@@ -232,26 +232,26 @@ if __name__ == "__main__":
             if line.strip()
         ]
 
-    scorer = AnomalyScorer()
-    explainer = BedrockExplainer()
+        scorer = AnomalyScorer()
+        explainer = BedrockExplainer()
 
-    for i, event in enumerate(events):
-        result = scorer.score(event)
-        if result is None or not result.is_anomaly:
-            continue
+        for i, event in enumerate(events):
+            result = scorer.score(event)
+            if result is None or not result.is_anomaly:
+                continue
 
-        # ±5 context window, clamped to list bounds
-        context = events[max(0, i - 5) : i + 6]
+            # ±5 context window, clamped to list bounds
+            context = events[max(0, i - 5) : i + 6]
 
-        print(f"\n{'='*60}")
-        print(f"ANOMALY at event [{i:03d}] — {event.service} {event.level}")
-        print(f"{'='*60}")
+            print(f"\n{'='*60}")
+            print(f"ANOMALY at event [{i:03d}] — {event.service} {event.level}")
+            print(f"{'='*60}")
 
-        explanation = await explainer.explain(event, context)
+            explanation = await explainer.explain(event, context)
 
-        print(f"Severity:  {explanation.severity}")
-        print(f"Summary:   {explanation.summary}")
-        print(f"Cause:     {explanation.likely_cause}")
-        print(f"Action:    {explanation.recommended_action}")
+            print(f"Severity:  {explanation.severity}")
+            print(f"Summary:   {explanation.summary}")
+            print(f"Cause:     {explanation.likely_cause}")
+            print(f"Action:    {explanation.recommended_action}")
 
-    asyncio.run(_smoke_test())
+        asyncio.run(_smoke_test())
