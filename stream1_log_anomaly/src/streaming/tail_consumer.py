@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 async def tail_file(
     filepath: Path,
-    queue: asyncio.Queue[dict],
+    queue: asyncio.Queue[LogEvent],
     poll_interval: float = 0.1,
     stop_event: asyncio.Event | None = None,
 ) -> None:
@@ -62,7 +62,7 @@ async def tail_file(
                 await asyncio.sleep(poll_interval)
 
 
-async def consume_queue(queue: asyncio.Queue[dict]) -> AsyncIterator[dict]:
+async def consume_queue(queue: asyncio.Queue[dict]) -> AsyncIterator[LogEvent]:
     """
     Async generator that yields events from the queue.
 
@@ -81,7 +81,7 @@ if __name__ == "__main__":
 
     async def _smoke_test() -> None:
         path = Path("stream1_log_anomaly/logs/sample.jsonl")
-        q: asyncio.Queue[dict] = asyncio.Queue()
+        q: asyncio.Queue[LogEvent] = asyncio.Queue()
         stop = asyncio.Event()
         count = 0
 

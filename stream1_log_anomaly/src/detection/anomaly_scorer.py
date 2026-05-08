@@ -40,7 +40,7 @@ class AnomalyResult:
         is_anomaly: True if scorer flagged this event as anomalous.
         window_id: Which scoring window produced this result (0-indexed).
     """
-    event: dict
+    event: LogEvent
     anomaly_score: float
     is_anomaly: bool
     window_id: int
