@@ -23,7 +23,7 @@ import boto3
 from botocore.exceptions import ClientError
 from pydantic import BaseModel, ConfigDict, ValidationError
 from stream1_log_anomaly.src.models import LogEvent
-
+from stream1_log_anomaly.src.explanation.prompts import build_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -203,7 +203,9 @@ class BedrockExplainer:
         Raises:
             RuntimeError: If explanation cannot be generated after retry.
         """
-        prompt = _build_prompt(anomalous_event, context_events)
+        #prompt = _build_prompt(anomalous_event, context_events)
+        prompt = build_prompt(anomalous_event, context_events)
+
 
         raw = await _call_bedrock(self._client, prompt)
         logger.debug("Bedrock raw response: %s", raw[:200])
