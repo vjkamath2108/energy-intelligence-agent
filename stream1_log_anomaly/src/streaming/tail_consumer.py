@@ -88,7 +88,7 @@ if __name__ == "__main__":
         async def drain() -> None:
             nonlocal count
             async for event in consume_queue(q):
-                print(f"[{count:03d}] {event.get('level')} — {event.get('service')} — latency: {event.get('latency_ms')} status:{event.get('status_code')}")
+                print(f"[{count:03d}] {event.level} — {event.service} — latency: {event.latency_ms} status:{event.status_code}")
                 count += 1
                 if count >= 50:
                     stop.set()

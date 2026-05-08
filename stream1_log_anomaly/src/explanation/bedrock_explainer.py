@@ -58,8 +58,8 @@ class Explanation(BaseModel):
 
 
 def _build_prompt(
-    anomalous_event: dict,
-    context_events: list[dict],
+    anomalous_event: LogEvent,
+    context_events: list[LogEvent],
 ) -> str:
     """
     Build the user prompt for the explainer.
@@ -174,8 +174,8 @@ class BedrockExplainer:
 
     def explain(
         self,
-        anomalous_event: dict,
-        context_events: list[dict],
+        anomalous_event: LogEvent,
+        context_events: list[LogEvent],
     ) -> Explanation:
         """
         Generate a structured explanation for an anomalous log event.
@@ -213,7 +213,7 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 
     events = [
-        json.loads(line)
+        LogEvent(**json.loads(line))
         for line in Path("stream1_log_anomaly/logs/sample.jsonl")
         .read_text()
         .splitlines()

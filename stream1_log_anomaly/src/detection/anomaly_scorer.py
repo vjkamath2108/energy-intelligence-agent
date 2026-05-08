@@ -60,7 +60,7 @@ class AnomalyScorer:
     """
     buffer_size: int = BUFFER_SIZE
     contamination: float = CONTAMINATION
-    _buffer: list[dict] = field(default_factory=list, repr=False)
+    _buffer: list[LogEvent] = field(default_factory=list, repr=False)
     _model: IsolationForest | None = field(default=None, repr=False)
     _window_id: int = field(default=0, repr=False)
 
@@ -151,7 +151,7 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 
     events = [
-        json.loads(line)
+        LogEvent(**json.loads(line))
         for line in Path("stream1_log_anomaly/logs/sample.jsonl").read_text().splitlines()
         if line.strip()
     ]
@@ -166,8 +166,8 @@ if __name__ == "__main__":
         status = "🚨 ANOMALY" if result.is_anomaly else "  normal "
         print(
             f"[{i:03d}] {status} | score={result.anomaly_score:+.4f} | "
-            f"{event.get('level')} {event.get('service')} "
-            f"latency={event.get('latency_ms')}ms"
+            f"{event.level} {event.service} "
+            f"latency={event.latency_ms}ms"
         )
         if result.is_anomaly:
             anomalies_detected += 1
