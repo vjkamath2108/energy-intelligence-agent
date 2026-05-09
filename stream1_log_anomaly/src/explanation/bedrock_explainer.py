@@ -215,7 +215,7 @@ class BedrockExplainer:
         except ValueError:
             logger.warning("Invalid JSON from Bedrock — retrying with stricter prompt")
             strict_prompt = prompt + "\n\nYou MUST return only valid JSON. Nothing else."
-            raw = _call_bedrock(self._client, strict_prompt)
+            raw = await _call_bedrock(self._client, strict_prompt)
             return _parse_explanation(raw)
 
 if __name__ == "__main__":

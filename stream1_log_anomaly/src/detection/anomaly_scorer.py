@@ -125,7 +125,7 @@ class AnomalyScorer:
         raw_score = float(self._model.score_samples(features)[0])
 
         # predict returns -1 for anomaly, 1 for normal
-        is_anomaly = self._model.predict(features)[0] == -1
+        is_anomaly = bool(self._model.predict(features)[0] == -1)
 
         result = AnomalyResult(
             event=event,

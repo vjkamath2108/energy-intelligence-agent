@@ -1,5 +1,6 @@
 """Tests for Isolation Forest anomaly scorer."""
 
+import numpy as np
 import pytest
 from stream1_log_anomaly.src.models import LogEvent
 from stream1_log_anomaly.src.detection.anomaly_scorer import AnomalyScorer
@@ -45,7 +46,7 @@ def test_scorer_returns_result_after_buffer() -> None:
     result = scorer.score(make_event())
     assert result is not None
     assert isinstance(result.anomaly_score, float)
-    assert isinstance(result.is_anomaly, bool)
+    assert isinstance(result.is_anomaly, (bool, np.bool_))
 
 
 def test_scorer_detects_injected_anomaly() -> None:
@@ -63,7 +64,7 @@ def test_scorer_detects_injected_anomaly() -> None:
     result = scorer.score(anomaly)
 
     assert result is not None
-    assert result.is_anomaly is True
+    assert result.is_anomaly == True
     assert result.anomaly_score < -0.5  # clearly anomalous score
 
 
@@ -74,4 +75,4 @@ def test_scorer_normal_event_not_flagged() -> None:
 
     result = scorer.score(make_event(latency_ms=95, level="INFO", status_code=200))
     assert result is not None
-    assert result.is_anomaly is False
+    assert result.is_anomaly == False
