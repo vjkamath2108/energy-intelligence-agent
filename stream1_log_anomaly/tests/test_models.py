@@ -43,3 +43,4 @@ def test_log_event_invalid_type_raises() -> None:
     data = valid_event_dict()
     data["latency_ms"] = "not_a_number"
     with pytest.raises(Exception):
+        LogEvent(**data)
