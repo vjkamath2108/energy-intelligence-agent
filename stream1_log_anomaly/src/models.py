@@ -29,3 +29,14 @@ class AnomalyResult(BaseModel):
     anomaly_score: float
     is_anomaly: bool
     window_id: int
+
+
+class Explanation(BaseModel):
+    """Structured LLM explanation of an anomaly event."""
+
+    model_config = ConfigDict(frozen=True)
+
+    severity: str
+    summary: str
+    likely_cause: str
+    recommended_action: str

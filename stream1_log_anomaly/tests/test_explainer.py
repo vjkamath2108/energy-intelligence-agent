@@ -10,7 +10,8 @@ import json
 import pytest
 from unittest.mock import AsyncMock, patch
 from stream1_log_anomaly.src.models import LogEvent
-from stream1_log_anomaly.src.explanation.bedrock_explainer import BedrockExplainer, Explanation
+from stream1_log_anomaly.src.models import Explanation
+from stream1_log_anomaly.src.explanation.bedrock_explainer import BedrockExplainer
 from stream1_log_anomaly.src.explanation.ollama_explainer import OllamaExplainer
 
 

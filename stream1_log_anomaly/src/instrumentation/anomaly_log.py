@@ -10,8 +10,7 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
-from stream1_log_anomaly.src.models import LogEvent
-from stream1_log_anomaly.src.explanation.bedrock_explainer import Explanation
+from stream1_log_anomaly.src.models import LogEvent, Explanation
 
 logger = logging.getLogger(__name__)
 

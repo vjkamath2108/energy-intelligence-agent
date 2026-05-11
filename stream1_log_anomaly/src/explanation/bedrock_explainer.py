@@ -21,9 +21,9 @@ from typing import Any
 import asyncio
 import boto3
 from botocore.exceptions import ClientError
-from pydantic import BaseModel, ConfigDict, ValidationError
+from pydantic import ValidationError
 
-from stream1_log_anomaly.src.models import LogEvent
+from stream1_log_anomaly.src.models import LogEvent, Explanation
 from stream1_log_anomaly.src.explanation.prompts import build_prompt
 from stream1_log_anomaly.src.instrumentation.langfuse_client import trace_explanation
 from stream1_log_anomaly.src.instrumentation.anomaly_log import append_explanation
@@ -37,25 +37,6 @@ BEDROCK_MODEL_ID = os.getenv(
 BEDROCK_REGION = "us-west-2"
 MAX_RETRIES = 3
 BASE_BACKOFF = 1.0
-
-
-class Explanation(BaseModel):
-    """
-    Structured LLM explanation of an anomaly event.
-
-    Attributes:
-        severity: HIGH, MEDIUM, or LOW.
-        summary: One sentence describing what happened.
-        likely_cause: Most probable root cause.
-        recommended_action: What an engineer should do next.
-    """
-
-    model_config = ConfigDict(frozen=True)
-
-    severity: str
-    summary: str
-    likely_cause: str
-    recommended_action: str
 
 
 def _call_bedrock_sync(client: Any, prompt: str) -> str:

@@ -28,7 +28,8 @@ from stream1_log_anomaly.src.models import LogEvent
 
 from stream1_log_anomaly.src.streaming.tail_consumer import tail_file, consume_queue
 from stream1_log_anomaly.src.detection.anomaly_scorer import AnomalyScorer
-from stream1_log_anomaly.src.explanation.bedrock_explainer import BedrockExplainer, Explanation
+from stream1_log_anomaly.src.models import Explanation
+from stream1_log_anomaly.src.explanation.bedrock_explainer import BedrockExplainer
 
 load_dotenv()
 

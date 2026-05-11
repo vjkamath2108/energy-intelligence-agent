@@ -20,9 +20,8 @@ import time
 import httpx
 from pydantic import ValidationError
 
-from stream1_log_anomaly.src.models import LogEvent
+from stream1_log_anomaly.src.models import LogEvent, Explanation
 from stream1_log_anomaly.src.explanation.prompts import build_prompt
-from stream1_log_anomaly.src.explanation.bedrock_explainer import Explanation
 from stream1_log_anomaly.src.instrumentation.langfuse_client import trace_explanation
 from stream1_log_anomaly.src.instrumentation.anomaly_log import append_explanation
 
