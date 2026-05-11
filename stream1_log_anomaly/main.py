@@ -95,7 +95,7 @@ async def pipeline(
                 result.anomaly_score,
             )
             try:
-                explanation = explainer.explain(event, context)
+                explanation = await explainer.explain(event, context)
                 _print_explanation(event, explanation, event_index)
             except Exception as e:
                 logger.error("Explainer failed for event %d: %s", event_index, e)
