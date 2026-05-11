@@ -14,27 +14,26 @@ Design decisions:
 
 import json
 import logging
+import os
 import time
 from typing import Any
-import asyncio
 
-import os
+import asyncio
 import boto3
 from botocore.exceptions import ClientError
 from pydantic import BaseModel, ConfigDict, ValidationError
+
 from stream1_log_anomaly.src.models import LogEvent
 from stream1_log_anomaly.src.explanation.prompts import build_prompt
 from stream1_log_anomaly.src.instrumentation.langfuse_client import trace_explanation
+from stream1_log_anomaly.src.instrumentation.anomaly_log import append_explanation
 
 logger = logging.getLogger(__name__)
 
-
-# us-west-2 requires regional inference profile prefix.
-# Raw model IDs (anthropic.claude-*) are rejected — use us.* prefix.
-# Full versioned IDs required — short aliases don't work with invoke_model.
-# BEDROCK_MODEL_ID = "us.anthropic.claude-opus-4-5-20251101-v1:0"
-BEDROCK_MODEL_ID = os.getenv("BEDROCK_MODEL_ID","us.anthropic.claude-sonnet-4-5-20250929-v1:0")
-
+BEDROCK_MODEL_ID = os.getenv(
+    "BEDROCK_MODEL_ID",
+    "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+)
 BEDROCK_REGION = "us-west-2"
 MAX_RETRIES = 3
 BASE_BACKOFF = 1.0
@@ -57,49 +56,6 @@ class Explanation(BaseModel):
     summary: str
     likely_cause: str
     recommended_action: str
-
-
-def _build_prompt(
-    anomalous_event: LogEvent,
-    context_events: list[LogEvent],
-) -> str:
-    """
-    Build the user prompt for the explainer.
-
-    Args:
-        anomalous_event: The event flagged as anomalous by Isolation Forest.
-        context_events: Surrounding ±5 events for causality context.
-    """
-    context_str = json.dumps([e.model_dump() for e in context_events], indent=2)
-    event_str = json.dumps(anomalous_event.model_dump(), indent=2)
-
-    return f"""You are an expert site reliability engineer analysing log anomalies.
-
-Surrounding context events (±5 around the anomaly):
-{context_str}
-
-Anomalous event flagged by Isolation Forest:
-{event_str}
-
-Respond ONLY with a JSON object. No preamble, no markdown, no explanation outside the JSON.Do not use markdown code fences. Do not write ```json.
-Start your response with {{ and end with }}.
-
-{{
-  "severity": "<HIGH|MEDIUM|LOW>",
-  "summary": "<one sentence: what happened>",
-  "likely_cause": "<most probable root cause>",
-  "recommended_action": "<what an engineer should do next>"
-}}"""
-
-async def _call_bedrock(client: Any, prompt: str) -> str:
-    """
-    Async wrapper around _call_bedrock_sync.
-    Runs the blocking boto3 call in a thread pool executor so it does
-    not block the asyncio event loop during Bedrock latency (typically 2-3s).
-    """
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(None, _call_bedrock_sync, client, prompt)
-
 
 
 def _call_bedrock_sync(client: Any, prompt: str) -> str:
@@ -150,15 +106,34 @@ def _call_bedrock_sync(client: Any, prompt: str) -> str:
     raise RuntimeError(f"Bedrock call failed after {MAX_RETRIES} attempts")
 
 
+async def _call_bedrock(client: Any, prompt: str) -> str:
+    """
+    Async wrapper around _call_bedrock_sync.
+
+    Runs the blocking boto3 call in a thread pool executor so it does
+    not block the asyncio event loop during Bedrock latency (typically 2-3s).
+    """
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, _call_bedrock_sync, client, prompt)
+
+
 def _parse_explanation(raw_text: str) -> Explanation:
+    """
+    Parse and validate raw Bedrock response into Explanation model.
+
+    Strips markdown fences if present.
+    Appends closing brace if model truncated response.
+    """
     clean = raw_text.strip()
     if clean.startswith("```"):
-        # Strip opening fence (```json or ```)
         clean = clean.split("\n", 1)[1]
     if clean.endswith("```"):
         clean = clean.rsplit("```", 1)[0]
     clean = clean.strip()
-    
+
+    if clean.startswith("{") and not clean.endswith("}"):
+        clean = clean + "}"
+
     try:
         data = json.loads(clean)
         return Explanation(**data)
@@ -175,7 +150,7 @@ class BedrockExplainer:
 
     Usage:
         explainer = BedrockExplainer()
-        explanation = explainer.explain(anomalous_event, context_events)
+        explanation = await explainer.explain(anomalous_event, context_events)
     """
 
     def __init__(self, region: str = BEDROCK_REGION) -> None:
@@ -193,6 +168,7 @@ class BedrockExplainer:
         Generate a structured explanation for an anomalous log event.
 
         Retries once with a stricter prompt if Claude returns invalid JSON.
+        Traces every call to Langfuse and appends to anomaly_log.jsonl.
 
         Args:
             anomalous_event: Event flagged by Isolation Forest.
@@ -205,6 +181,7 @@ class BedrockExplainer:
             RuntimeError: If explanation cannot be generated after retry.
         """
         prompt = build_prompt(anomalous_event, context_events)
+        start = time.monotonic()
 
         async with trace_explanation(
             service=anomalous_event.service,
@@ -225,17 +202,22 @@ class BedrockExplainer:
                 explanation = _parse_explanation(raw)
 
             span["output"] = explanation.model_dump()
-            return explanation
+
+        elapsed_ms = (time.monotonic() - start) * 1000
+        append_explanation(anomalous_event, explanation, "bedrock", elapsed_ms)
+
+        return explanation
 
 
 if __name__ == "__main__":
+    import asyncio
     import json
     from pathlib import Path
     from stream1_log_anomaly.src.detection.anomaly_scorer import AnomalyScorer
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 
-    async def _smoke_test()-> None:
+    async def _smoke_test() -> None:
         events = [
             LogEvent(**json.loads(line))
             for line in Path("stream1_log_anomaly/logs/sample.jsonl")
@@ -252,7 +234,6 @@ if __name__ == "__main__":
             if result is None or not result.is_anomaly:
                 continue
 
-            # ±5 context window, clamped to list bounds
             context = events[max(0, i - 5) : i + 6]
 
             print(f"\n{'='*60}")

@@ -15,13 +15,16 @@ Design decisions:
 import json
 import logging
 import os
+import time
 
 import httpx
 from pydantic import ValidationError
 
-from stream1_log_anomaly.src.explanation.prompts import build_prompt
 from stream1_log_anomaly.src.models import LogEvent
+from stream1_log_anomaly.src.explanation.prompts import build_prompt
 from stream1_log_anomaly.src.explanation.bedrock_explainer import Explanation
+from stream1_log_anomaly.src.instrumentation.langfuse_client import trace_explanation
+from stream1_log_anomaly.src.instrumentation.anomaly_log import append_explanation
 
 logger = logging.getLogger(__name__)
 
@@ -46,9 +49,9 @@ async def _call_ollama(prompt: str) -> str:
     payload = {
         "model": OLLAMA_MODEL,
         "prompt": prompt,
-        "stream": False,  # get full response in one shot, not streaming chunks
+        "stream": False,
         "options": {
-            "num_predict": 512,  # increase from default
+            "num_predict": 512,
         },
     }
 
@@ -64,7 +67,14 @@ async def _call_ollama(prompt: str) -> str:
         except httpx.HTTPError as e:
             raise RuntimeError(f"Ollama call failed: {e}") from e
 
+
 def _parse_explanation(raw_text: str) -> Explanation:
+    """
+    Parse and validate raw Ollama response into Explanation model.
+
+    Strips markdown fences if present.
+    Appends closing brace if model truncated response.
+    """
     clean = raw_text.strip()
     if clean.startswith("```"):
         clean = clean.split("\n", 1)[1]
@@ -72,7 +82,6 @@ def _parse_explanation(raw_text: str) -> Explanation:
         clean = clean.rsplit("```", 1)[0]
     clean = clean.strip()
 
-    # Small models sometimes truncate the closing brace — add it if missing
     if clean.startswith("{") and not clean.endswith("}"):
         clean = clean + "}"
 
@@ -104,6 +113,7 @@ class OllamaExplainer:
         Generate a structured explanation for an anomalous log event.
 
         Retries once with stricter prompt if model returns invalid JSON.
+        Traces every call to Langfuse and appends to anomaly_log.jsonl.
 
         Args:
             anomalous_event: Event flagged by Isolation Forest.
@@ -116,21 +126,37 @@ class OllamaExplainer:
             RuntimeError: If explanation cannot be generated after retry.
         """
         prompt = build_prompt(anomalous_event, context_events)
+        start = time.monotonic()
 
-        raw = await _call_ollama(prompt)
-        logger.debug("Ollama raw response: %s", raw[:200])
+        async with trace_explanation(
+            service=anomalous_event.service,
+            level=anomalous_event.level,
+            latency_ms=anomalous_event.latency_ms,
+            backend="ollama",
+            prompt=prompt,
+        ) as span:
+            raw = await _call_ollama(prompt)
+            logger.debug("Ollama raw response: %s", raw[:200])
 
-        try:
-            return _parse_explanation(raw)
-        except ValueError:
-            logger.warning("Invalid JSON from Ollama — retrying with stricter prompt")
-            strict_prompt = prompt + "\n\nYou MUST return only valid JSON. Nothing else."
-            raw = await _call_ollama(strict_prompt)
-            return _parse_explanation(raw)
+            try:
+                explanation = _parse_explanation(raw)
+            except ValueError:
+                logger.warning("Invalid JSON from Ollama — retrying with stricter prompt")
+                strict_prompt = prompt + "\n\nYou MUST return only valid JSON. Nothing else."
+                raw = await _call_ollama(strict_prompt)
+                explanation = _parse_explanation(raw)
+
+            span["output"] = explanation.model_dump()
+
+        elapsed_ms = (time.monotonic() - start) * 1000
+        append_explanation(anomalous_event, explanation, "ollama", elapsed_ms)
+
+        return explanation
 
 
 if __name__ == "__main__":
     import asyncio
+    import json
     from pathlib import Path
     from stream1_log_anomaly.src.detection.anomaly_scorer import AnomalyScorer
 
