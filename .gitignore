@@ -238,6 +238,10 @@ venv/
 .idea/
 *.swp
 
+# macOS
+.DS_Store
+**/.DS_Store
+
 # Logs
 *.log
 

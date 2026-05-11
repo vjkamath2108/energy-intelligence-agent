@@ -24,6 +24,7 @@ from botocore.exceptions import ClientError
 from pydantic import BaseModel, ConfigDict, ValidationError
 from stream1_log_anomaly.src.models import LogEvent
 from stream1_log_anomaly.src.explanation.prompts import build_prompt
+from stream1_log_anomaly.src.instrumentation.langfuse_client import trace_explanation
 
 logger = logging.getLogger(__name__)
 
@@ -203,20 +204,29 @@ class BedrockExplainer:
         Raises:
             RuntimeError: If explanation cannot be generated after retry.
         """
-        #prompt = _build_prompt(anomalous_event, context_events)
         prompt = build_prompt(anomalous_event, context_events)
 
+        async with trace_explanation(
+            service=anomalous_event.service,
+            level=anomalous_event.level,
+            latency_ms=anomalous_event.latency_ms,
+            backend="bedrock",
+            prompt=prompt,
+        ) as span:
+            raw = await _call_bedrock(self._client, prompt)
+            logger.debug("Bedrock raw response: %s", raw[:200])
 
-        raw = await _call_bedrock(self._client, prompt)
-        logger.debug("Bedrock raw response: %s", raw[:200])
+            try:
+                explanation = _parse_explanation(raw)
+            except ValueError:
+                logger.warning("Invalid JSON from Bedrock — retrying with stricter prompt")
+                strict_prompt = prompt + "\n\nYou MUST return only valid JSON. Nothing else."
+                raw = await _call_bedrock(self._client, strict_prompt)
+                explanation = _parse_explanation(raw)
 
-        try:
-            return _parse_explanation(raw)
-        except ValueError:
-            logger.warning("Invalid JSON from Bedrock — retrying with stricter prompt")
-            strict_prompt = prompt + "\n\nYou MUST return only valid JSON. Nothing else."
-            raw = await _call_bedrock(self._client, strict_prompt)
-            return _parse_explanation(raw)
+            span["output"] = explanation.model_dump()
+            return explanation
+
 
 if __name__ == "__main__":
     import json

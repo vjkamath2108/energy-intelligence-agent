@@ -47,6 +47,9 @@ async def _call_ollama(prompt: str) -> str:
         "model": OLLAMA_MODEL,
         "prompt": prompt,
         "stream": False,  # get full response in one shot, not streaming chunks
+        "options": {
+            "num_predict": 512,  # increase from default
+        },
     }
 
     async with httpx.AsyncClient(timeout=60.0) as client:
@@ -61,19 +64,17 @@ async def _call_ollama(prompt: str) -> str:
         except httpx.HTTPError as e:
             raise RuntimeError(f"Ollama call failed: {e}") from e
 
-
 def _parse_explanation(raw_text: str) -> Explanation:
-    """
-    Parse and validate raw Ollama response into Explanation model.
-
-    Strips markdown fences if present — some models add them despite instructions.
-    """
     clean = raw_text.strip()
     if clean.startswith("```"):
         clean = clean.split("\n", 1)[1]
     if clean.endswith("```"):
         clean = clean.rsplit("```", 1)[0]
     clean = clean.strip()
+
+    # Small models sometimes truncate the closing brace — add it if missing
+    if clean.startswith("{") and not clean.endswith("}"):
+        clean = clean + "}"
 
     try:
         data = json.loads(clean)
