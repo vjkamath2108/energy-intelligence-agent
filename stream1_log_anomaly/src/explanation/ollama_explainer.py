@@ -55,6 +55,10 @@ def _parse_explanation(raw_text: str) -> Explanation:
 
     try:
         data = json.loads(clean)
+        # Normalise severity: strip whitespace, angle brackets, formatting artifacts
+        # Ollama occasionally returns "<MEDIUM>" or " HIGH" — clean before validation
+        if "severity" in data and isinstance(data["severity"], str):
+            data["severity"] = data["severity"].strip().strip("<>").strip().upper()
         return Explanation(**data)
     except (json.JSONDecodeError, ValidationError) as e:
         raise ValueError(f"Failed to parse explanation: {e}\nRaw: {raw_text}") from e
