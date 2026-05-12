@@ -94,6 +94,14 @@ async def _run_backend(
 
     Returns list of result dicts, one per anomaly event.
     """
+    # Compute backend label once — includes model name for ollama
+    # e.g. "bedrock", "ollama:llama3.2:3b", "ollama:phi4-mini"
+    backend_label = (
+        backend_name
+        if backend_name == "bedrock"
+        else f"ollama:{os.getenv('OLLAMA_MODEL', 'llama3.2:3b')}"
+    )
+
     results = []
 
     if backend_name == "bedrock":
@@ -108,7 +116,7 @@ async def _run_backend(
             logger.error("Ollama health check failed: %s", e)
             raise
 
-    logger.info("Running %s backend on %d anomaly events...", backend_name, len(anomalies))
+    logger.info("Running %s on %d anomaly events...", backend_label, len(anomalies))
 
     for event_index, event, context in anomalies:
         start = time.monotonic()
@@ -131,7 +139,7 @@ async def _run_backend(
         severity_correct = predicted_severity == ground_truth
 
         result = {
-            "backend": backend_name,
+            "backend": backend_label,
             "event_index": event_index,
             "service": event.service,
             "level": event.level,
@@ -156,7 +164,7 @@ async def _run_backend(
 
         logger.info(
             "[%s] event=%d pattern=%s gt=%s predicted=%s correct=%s latency=%.0fms",
-            backend_name,
+            backend_label,
             event_index,
             result["anomaly_pattern"],
             ground_truth,
@@ -210,7 +218,14 @@ def _write_markdown_report(
     RESULTS_DIR.mkdir(exist_ok=True)
     report_path = RESULTS_DIR / "bedrock_vs_ollama.md"
     ts = datetime.now().strftime("%Y-%m-%d")
-    model_name = os.getenv("OLLAMA_MODEL", "llama3.2:3b")
+
+    # Derive model names from actual results — not from current env var
+    ollama_models = sorted({
+        r["backend"].replace("ollama:", "")
+        for r in ollama_results
+        if r.get("backend", "").startswith("ollama:")
+    })
+    ollama_models_str = ", ".join(ollama_models) if ollama_models else "unknown"
 
     lines = [
         "# Bedrock vs Ollama — Benchmark Report",
@@ -218,8 +233,8 @@ def _write_markdown_report(
         "",
         f"**Date:** {ts}  ",
         f"**Dataset:** {LOG_FILE} ({bedrock_stats['total_events']} anomaly events from 300 synthetic logs)  ",
-        f"**Bedrock model:** claude-sonnet-4-5 (via AWS Bedrock, eu-west-2)  ",
-        f"**Ollama model:** {model_name} (local inference, Apple M4 Max)  ",
+        "**Bedrock model:** claude-sonnet-4-5 (us.* cross-region inference profile)  ",
+        f"**Ollama models tested:** {ollama_models_str} (local inference, Apple M4 Max)  ",
         f"**Anomaly detector:** Isolation Forest (contamination=auto)  ",
         "",
         "---",
@@ -243,7 +258,7 @@ def _write_markdown_report(
         "",
         "## Results",
         "",
-        "| Metric | Bedrock (claude-sonnet-4-5) | Ollama ({}) |".format(model_name),
+        f"| Metric | Bedrock (claude-sonnet-4-5) | {ollama_models_str} (combined) |",
         "|---|---|---|",
         f"| Events explained | {bedrock_stats['total_events']} | {ollama_stats['total_events']} |",
         f"| JSON validity | {bedrock_stats['json_validity_rate']} | {ollama_stats['json_validity_rate']} |",
@@ -253,9 +268,9 @@ def _write_markdown_report(
         f"| Pattern C accuracy (error surge) | {bedrock_stats['pattern_accuracy']['C_error_surge']} | {ollama_stats['pattern_accuracy']['C_error_surge']} |",
         f"| Latency P50 | {bedrock_stats['latency_p50_ms']}ms | {ollama_stats['latency_p50_ms']}ms |",
         f"| Latency P95 | {bedrock_stats['latency_p95_ms']}ms | {ollama_stats['latency_p95_ms']}ms |",
-        f"| Data leaves network | Yes (AWS eu-west-2) | No |",
-        f"| Cost per call | ~$0.003 | ~$0 |",
-        f"| Production-ready | Yes | No |",
+        "| Data leaves network | Yes (AWS us.* cross-region) | No |",
+        "| Cost per call | ~$0.003 | ~$0 |",
+        "| Production-ready | Yes | No |",
         "",
         "---",
         "",
@@ -265,7 +280,7 @@ def _write_markdown_report(
         "",
         "The most significant quality difference is severity classification.",
         f"Bedrock achieved {bedrock_stats['severity_accuracy']} overall severity accuracy.",
-        f"Ollama ({model_name}) achieved {ollama_stats['severity_accuracy']}.",
+        f"Ollama models ({ollama_models_str}) achieved {ollama_stats['severity_accuracy']} combined.",
         "",
         "The gap is most pronounced on Pattern A (cascading failure) and Pattern B (latency spike).",
         "Ollama defaults to MEDIUM for the majority of events regardless of signal strength,",
@@ -335,9 +350,9 @@ def _write_markdown_report(
         "",
         "## What I Would Do Differently",
         "",
-        "1. **Run a larger Ollama model.** llama3.2:3b is the smallest practical model.",
-        "   A fairer comparison would use llama3.1:8b or qwen3:14b — better reasoning,",
-        "   still local. This is Sprint 3.3 (phi-4-mini comparison).",
+        f"1. **Three models tested:** {ollama_models_str}. A further comparison with",
+        "   llama3.1:8b or qwen3:14b would show whether the quality gap narrows",
+        "   significantly at 8B+ parameters while remaining local.",
         "",
         "2. **Add human quality ratings (1–5).** Severity accuracy is ground-truth-based.",
         "   Production evaluation would need on-call engineer ratings of explanation",
@@ -374,7 +389,7 @@ def _load_raw_results(backend: str) -> list[dict]:
         for line in raw_path.read_text().splitlines()
         if line.strip()
     ]
-    return [r for r in results if r.get("backend") == backend]
+    return [r for r in results if r.get("backend", "").startswith(backend)]
 
 
 async def main(run_bedrock: bool, run_ollama: bool, report_only: bool) -> None:

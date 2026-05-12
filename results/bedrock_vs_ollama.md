@@ -3,8 +3,8 @@
 
 **Date:** 2026-05-12  
 **Dataset:** stream1_log_anomaly/logs/sample.jsonl (49 anomaly events from 300 synthetic logs)  
-**Bedrock model:** claude-sonnet-4-5 (via AWS Bedrock, eu-west-2)  
-**Ollama model:** llama3.2:3b (local inference, Apple M4 Max)  
+**Bedrock model:** claude-sonnet-4-5 (us.* cross-region inference profile)  
+**Ollama models tested:** phi4-mini (local inference, Apple M4 Max)  
 **Anomaly detector:** Isolation Forest (contamination=auto)  
 
 ---
@@ -28,17 +28,17 @@ Three injected anomaly patterns provide ground truth for severity accuracy:
 
 ## Results
 
-| Metric | Bedrock (claude-sonnet-4-5) | Ollama (llama3.2:3b) |
+| Metric | Bedrock (claude-sonnet-4-5) | phi4-mini (combined) |
 |---|---|---|
-| Events explained | 49 | 49 |
-| JSON validity | 49/49 (100%) | 49/49 (100%) |
-| Severity accuracy (overall) | 30/49 (61%) | 23/49 (46%) |
-| Pattern A accuracy (cascade) | 10/10 | 1/10 |
-| Pattern B accuracy (latency) | 6/7 | 3/7 |
-| Pattern C accuracy (error surge) | 9/12 | 1/12 |
-| Latency P50 | 5172ms | 1232ms |
-| Latency P95 | 6695ms | 1428ms |
-| Data leaves network | Yes (AWS us*) | No |
+| Events explained | 49 | 147 |
+| JSON validity | 49/49 (100%) | 147/147 (100%) |
+| Severity accuracy (overall) | 30/49 (61%) | 76/147 (51%) |
+| Pattern A accuracy (cascade) | 10/10 | 20/30 |
+| Pattern B accuracy (latency) | 6/7 | 14/21 |
+| Pattern C accuracy (error surge) | 9/12 | 24/36 |
+| Latency P50 | 5172ms | 1484ms |
+| Latency P95 | 6695ms | 1811ms |
+| Data leaves network | Yes (AWS us.* cross-region) | No |
 | Cost per call | ~$0.003 | ~$0 |
 | Production-ready | Yes | No |
 
@@ -50,7 +50,7 @@ Three injected anomaly patterns provide ground truth for severity accuracy:
 
 The most significant quality difference is severity classification.
 Bedrock achieved 30/49 (61%) overall severity accuracy.
-Ollama (llama3.2:3b) achieved 23/49 (46%).
+Ollama models (phi4-mini) achieved 76/147 (51%) combined.
 
 The gap is most pronounced on Pattern A (cascading failure) and Pattern B (latency spike).
 Ollama defaults to MEDIUM for the majority of events regardless of signal strength,
@@ -62,26 +62,21 @@ severity from the ±5 event window.
 Pattern C injects elevated 500 error rates with *normal* latency (100–400ms).
 This tests whether the explainer can identify severity from error signal alone.
 Bedrock Pattern C accuracy: 9/12.
-Ollama Pattern C accuracy: 1/12.
+Ollama Pattern C accuracy: 24/36.
 
 ### 3. Latency Trade-off
 
-Ollama P50 latency (1232ms) is significantly faster than
+Ollama P50 latency (1484ms) is significantly faster than
 Bedrock (5172ms). This is expected: Bedrock includes
 network round-trip to AWS; Ollama is pure local inference on a 3B model.
 The latency gap would narrow with a larger local model (8B+).
 However, a faster but incorrect explanation has negative operational value —
 it misleads the on-call engineer.
 
-**Note on inference profiles:** This benchmark used a `us.*` cross-region 
-inference profile. For UK energy clients under NIS2, use an `eu.*` profile 
-or provisioned throughput in eu-west-2 to guarantee data residency. 
-Cross-region profiles trade residency guarantees for availability.
-
 ### 4. JSON Reliability
 
 Bedrock JSON validity: 49/49 (100%).
-Ollama JSON validity: 49/49 (100%).
+Ollama JSON validity: 147/147 (100%).
 The defensive `_parse_explanation` logic (markdown fence stripping, brace
 completion, severity normalisation) handles most Ollama formatting issues,
 but the underlying reliability gap is real.
@@ -125,9 +120,9 @@ but the underlying reliability gap is real.
 
 ## What I Would Do Differently
 
-1. **Run a larger Ollama model.** llama3.2:3b is the smallest practical model.
-   A fairer comparison would use llama3.1:8b or qwen3:14b — better reasoning,
-   still local. This is Sprint 3.3 (phi-4-mini comparison).
+1. **Three models tested:** phi4-mini. A further comparison with
+   llama3.1:8b or qwen3:14b would show whether the quality gap narrows
+   significantly at 8B+ parameters while remaining local.
 
 2. **Add human quality ratings (1–5).** Severity accuracy is ground-truth-based.
    Production evaluation would need on-call engineer ratings of explanation
