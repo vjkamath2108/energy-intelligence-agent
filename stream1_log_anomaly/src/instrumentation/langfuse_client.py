@@ -75,6 +75,7 @@ async def trace_explanation(
     latency_ms: int,
     backend: str,
     prompt: str,
+    model: str | None = None,
 ) -> AsyncIterator[dict]:
     """
     Async context manager that records one anomaly explanation as a Langfuse
@@ -89,11 +90,15 @@ async def trace_explanation(
         service: Service name from the anomalous log event.
         level: Log level of the anomalous event (ERROR, WARN, etc.).
         latency_ms: Observed latency of the anomalous event.
-        backend: "bedrock" or "ollama" — used as the model label.
+        backend: "bedrock" or "ollama" — stored as metadata tag.
         prompt: The rendered prompt sent to the LLM.
+        model: Specific model name (e.g. "llama3.2:3b", "claude-sonnet-4-5").
+               Passed to Langfuse model field for per-model filtering.
+               Defaults to backend name if not provided.
     """
     lf = get_langfuse()
     span_data: dict = {}
+    model_label = model or backend
 
     if lf is None:
         yield span_data
@@ -103,7 +108,7 @@ async def trace_explanation(
         with lf.start_as_current_observation(
             name="anomaly-explanation",
             as_type="generation",
-            model=backend,
+            model=model_label,
             input=prompt,
             metadata={
                 "service": service,

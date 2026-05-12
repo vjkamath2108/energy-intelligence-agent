@@ -2,17 +2,25 @@
 Stream 1 — Log Anomaly Pipeline entry point.
 
 Wires together:
-    tail_consumer → anomaly_scorer → bedrock_explainer
+    tail_consumer → anomaly_scorer → explainer (bedrock | ollama)
 
 Usage:
     python -m stream1_log_anomaly.main
-    python -m stream1_log_anomaly.main --explainer ollama   # not yet implemented
+    python -m stream1_log_anomaly.main --explainer ollama
+    python -m stream1_log_anomaly.main --explainer bedrock
     python -m stream1_log_anomaly.main --log-file path/to/file.jsonl
 
 Pipeline flow:
     1. tail_file() reads JSONL log file → asyncio.Queue
     2. pipeline() consumes queue → AnomalyScorer.score()
-    3. On anomaly: BedrockExplainer.explain() → print structured output
+    3. On anomaly: explainer.explain() → print structured output
+
+Explainer backends:
+    bedrock — AWS Bedrock (Claude Sonnet). Requires AWS credentials. Data
+              leaves the machine to AWS us-east-1 / eu-west-2.
+    ollama  — Local Ollama instance. Zero AWS calls. Requires Ollama running
+              and the configured model pulled (default: llama3.2:3b).
+              Set OLLAMA_MODEL env var to switch models.
 """
 
 import argparse
@@ -30,6 +38,7 @@ from stream1_log_anomaly.src.streaming.tail_consumer import tail_file, consume_q
 from stream1_log_anomaly.src.detection.anomaly_scorer import AnomalyScorer
 from stream1_log_anomaly.src.models import Explanation
 from stream1_log_anomaly.src.explanation.bedrock_explainer import BedrockExplainer
+from stream1_log_anomaly.src.explanation.ollama_explainer import OllamaExplainer
 
 load_dotenv()
 
@@ -56,7 +65,7 @@ def _print_explanation(event: LogEvent, explanation: Explanation, event_index: i
 
 async def pipeline(
     queue: asyncio.Queue[LogEvent],
-    explainer: BedrockExplainer,
+    explainer: BedrockExplainer | OllamaExplainer,
     stop_event: asyncio.Event,
 ) -> None:
     """
@@ -125,22 +134,30 @@ async def main(log_file: Path, explainer_backend: str) -> None:
         raise FileNotFoundError(f"Log file not found: {log_file}")
 
     if explainer_backend == "ollama":
-        raise NotImplementedError(
-            "Ollama explainer not yet implemented — coming in Sprint 1. "
-            "Run with --explainer bedrock"
-        )
-
-    explainer = BedrockExplainer(region=os.getenv("AWS_REGION", "eu-west-2"))
+        ollama_explainer = OllamaExplainer()
+        try:
+            await ollama_explainer.check_health()
+        except RuntimeError as e:
+            print(f"\nError: {e}\n")
+            raise SystemExit(1)
+        explainer: BedrockExplainer | OllamaExplainer = ollama_explainer
+    else:
+        explainer = BedrockExplainer(region=os.getenv("AWS_REGION", "eu-west-2"))
 
     queue: asyncio.Queue[LogEvent] = asyncio.Queue()
     stop_event = asyncio.Event()
 
     logger.info("Starting pipeline — log file: %s, explainer: %s", log_file, explainer_backend)
 
-    await asyncio.gather(
-        tail_file(log_file, queue, stop_event=stop_event),
-        pipeline(queue, explainer, stop_event),
-    )
+    try:
+        await asyncio.gather(
+            tail_file(log_file, queue, stop_event=stop_event),
+            pipeline(queue, explainer, stop_event),
+        )
+    finally:
+        # Clean up shared httpx client if using Ollama
+        if isinstance(explainer, OllamaExplainer):
+            await explainer.aclose()
 
 
 if __name__ == "__main__":
