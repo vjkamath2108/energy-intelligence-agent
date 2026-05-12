@@ -38,7 +38,7 @@ Three injected anomaly patterns provide ground truth for severity accuracy:
 | Pattern C accuracy (error surge) | 9/12 | 1/12 |
 | Latency P50 | 5172ms | 1232ms |
 | Latency P95 | 6695ms | 1428ms |
-| Data leaves network | Yes (AWS eu-west-2) | No |
+| Data leaves network | Yes (AWS us*) | No |
 | Cost per call | ~$0.003 | ~$0 |
 | Production-ready | Yes | No |
 
@@ -72,6 +72,11 @@ network round-trip to AWS; Ollama is pure local inference on a 3B model.
 The latency gap would narrow with a larger local model (8B+).
 However, a faster but incorrect explanation has negative operational value —
 it misleads the on-call engineer.
+
+**Note on inference profiles:** This benchmark used a `us.*` cross-region 
+inference profile. For UK energy clients under NIS2, use an `eu.*` profile 
+or provisioned throughput in eu-west-2 to guarantee data residency. 
+Cross-region profiles trade residency guarantees for availability.
 
 ### 4. JSON Reliability
 
