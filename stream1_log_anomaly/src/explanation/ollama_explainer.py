@@ -158,7 +158,7 @@ class OllamaExplainer:
             "prompt": prompt,
             "stream": False,
             "options": {
-                "num_predict": 512,
+                "num_predict": int(os.getenv("OLLAMA_NUM_PREDICT", "512")),
             },
         }
 
@@ -231,7 +231,10 @@ class OllamaExplainer:
                     "No markdown. No explanation. No text before or after the JSON."
                 )
                 raw, _ = await self._call_ollama(strict_prompt)
-                explanation = _parse_explanation(raw)
+                try:
+                    explanation = _parse_explanation(raw)
+                except ValueError as e:
+                    raise RuntimeError(f"Failed after retry: {e}") from e
 
             elapsed_ms = (time.monotonic() - start) * 1000
 

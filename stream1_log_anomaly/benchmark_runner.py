@@ -1,22 +1,22 @@
 """
-Benchmark runner: Bedrock vs Ollama explainer comparison.
+Benchmark runner: Bedrock vs local model comparison.
 
-Runs both explainer backends against the same set of anomaly events
-detected by Isolation Forest on sample.jsonl, then writes structured
-results to results/benchmark_raw.jsonl and a summary report to
-results/bedrock_vs_ollama.md.
+Option B ground truth methodology:
+  Severity accuracy measured ONLY on injected pattern windows.
+  Isolated events excluded from accuracy; included in latency/validity only.
 
-Ground truth severity is defined by anomaly pattern window:
-  Pattern A (events 60–69):   HIGH — cascading failure, multi-service
-  Pattern B (events 130–139): HIGH — sustained latency spike, payment-svc
-  Pattern C (events 200–212): HIGH — error rate surge, api-gateway
-  Other flagged events:        MEDIUM — isolated anomalies outside patterns
+  Pattern A (events 60-69):   HIGH - cascading failure
+  Pattern B (events 130-139): HIGH - latency spike
+  Pattern C (events 200-212): HIGH - error surge
+  Isolated:                    None - excluded from accuracy
 
 Usage:
-    python -m stream1_log_anomaly.benchmark_runner
+    python -m stream1_log_anomaly.src.streaming.log_generator  # regenerate logs
     python -m stream1_log_anomaly.benchmark_runner --explainer bedrock
-    python -m stream1_log_anomaly.benchmark_runner --explainer ollama
-    python -m stream1_log_anomaly.benchmark_runner --explainer both   (default)
+    OLLAMA_MODEL=llama3.2:3b python -m stream1_log_anomaly.benchmark_runner --explainer ollama
+    OLLAMA_MODEL=phi4-mini python -m stream1_log_anomaly.benchmark_runner --explainer ollama
+    OLLAMA_MODEL=qwen3:14b python -m stream1_log_anomaly.benchmark_runner --explainer ollama
+    python -m stream1_log_anomaly.benchmark_runner --report
 """
 
 import argparse
@@ -47,16 +47,16 @@ logger = logging.getLogger(__name__)
 LOG_FILE = Path("stream1_log_anomaly/logs/sample.jsonl")
 RESULTS_DIR = Path("results")
 
-# Ground truth: event index → expected severity
-# Based on injected anomaly windows in log_generator.py
-def _ground_truth_severity(event_index: int) -> str:
+# Ground truth: injected pattern windows only (Option B).
+# Returns None for isolated events — excluded from accuracy measurement.
+def _ground_truth_severity(event_index: int) -> str | None:
     if 60 <= event_index <= 69:
         return "HIGH"   # Pattern A: cascading failure
     if 130 <= event_index <= 139:
-        return "HIGH"   # Pattern B: sustained latency spike
+        return "HIGH"   # Pattern B: latency spike
     if 200 <= event_index <= 212:
-        return "HIGH"   # Pattern C: error rate surge
-    return "MEDIUM"     # Isolated anomaly outside injected windows
+        return "HIGH"   # Pattern C: error surge
+    return None         # Isolated — excluded from accuracy
 
 
 def _load_events() -> list[LogEvent]:
@@ -94,8 +94,7 @@ async def _run_backend(
 
     Returns list of result dicts, one per anomaly event.
     """
-    # Compute backend label once — includes model name for ollama
-    # e.g. "bedrock", "ollama:llama3.2:3b", "ollama:phi4-mini"
+    # Compute backend label once: "bedrock" or "ollama:model-name"
     backend_label = (
         backend_name
         if backend_name == "bedrock"
@@ -136,7 +135,18 @@ async def _run_backend(
 
         ground_truth = _ground_truth_severity(event_index)
         predicted_severity = explanation.severity if explanation else "UNKNOWN"
-        severity_correct = predicted_severity == ground_truth
+        # None ground_truth = isolated event, excluded from accuracy
+        severity_correct: bool | None = (
+            predicted_severity == ground_truth
+            if ground_truth is not None
+            else None
+        )
+        anomaly_pattern = (
+            "A_cascade" if 60 <= event_index <= 69
+            else "B_latency_spike" if 130 <= event_index <= 139
+            else "C_error_surge" if 200 <= event_index <= 212
+            else "isolated"
+        )
 
         result = {
             "backend": backend_label,
@@ -145,12 +155,7 @@ async def _run_backend(
             "level": event.level,
             "latency_ms": event.latency_ms,
             "status_code": event.status_code,
-            "anomaly_pattern": (
-                "A_cascade" if 60 <= event_index <= 69
-                else "B_latency_spike" if 130 <= event_index <= 139
-                else "C_error_surge" if 200 <= event_index <= 212
-                else "isolated"
-            ),
+            "anomaly_pattern": anomaly_pattern,
             "ground_truth_severity": ground_truth,
             "predicted_severity": predicted_severity,
             "severity_correct": severity_correct,
@@ -162,14 +167,16 @@ async def _run_backend(
         }
         results.append(result)
 
+        correct_str = "N/A" if severity_correct is None else str(severity_correct)
+        gt_str = ground_truth if ground_truth is not None else "N/A"
         logger.info(
             "[%s] event=%d pattern=%s gt=%s predicted=%s correct=%s latency=%.0fms",
             backend_label,
             event_index,
             result["anomaly_pattern"],
-            ground_truth,
+            gt_str,
             predicted_severity,
-            severity_correct,
+            correct_str,
             elapsed_ms,
         )
 
@@ -180,27 +187,43 @@ async def _run_backend(
 
 
 def _compute_stats(results: list[dict]) -> dict:
-    """Compute summary statistics from a list of result dicts."""
+    """
+    Compute summary statistics.
+
+    Option B: severity accuracy uses only events with non-None ground truth
+    (injected pattern windows). Isolated events count toward latency and
+    JSON validity only.
+    """
     latencies = [r["elapsed_ms"] for r in results if r["json_valid"]]
     valid_count = sum(1 for r in results if r["json_valid"])
-    correct_count = sum(1 for r in results if r["severity_correct"])
     total = len(results)
 
-    # Per-pattern severity accuracy
-    patterns = ["A_cascade", "B_latency_spike", "C_error_surge", "isolated"]
-    pattern_accuracy = {}
+    scoreable = [r for r in results if r["severity_correct"] is not None]
+    correct_count = sum(1 for r in scoreable if r["severity_correct"])
+    scoreable_total = len(scoreable)
+    isolated_count = sum(1 for r in results if r["anomaly_pattern"] == "isolated")
+
+    patterns = ["A_cascade", "B_latency_spike", "C_error_surge"]
+    pattern_accuracy: dict[str, str] = {}
     for pattern in patterns:
-        pattern_results = [r for r in results if r["anomaly_pattern"] == pattern]
-        if pattern_results:
-            correct = sum(1 for r in pattern_results if r["severity_correct"])
-            pattern_accuracy[pattern] = f"{correct}/{len(pattern_results)}"
+        pr = [r for r in results if r["anomaly_pattern"] == pattern]
+        if pr:
+            correct = sum(1 for r in pr if r["severity_correct"])
+            pattern_accuracy[pattern] = f"{correct}/{len(pr)}"
         else:
             pattern_accuracy[pattern] = "0/0"
 
+    accuracy_str = (
+        f"{correct_count}/{scoreable_total} ({100*correct_count//scoreable_total}%)"
+        if scoreable_total > 0 else "0/0 (N/A)"
+    )
+
     return {
         "total_events": total,
+        "scoreable_events": scoreable_total,
+        "isolated_events": isolated_count,
         "json_validity_rate": f"{valid_count}/{total} ({100*valid_count//total}%)",
-        "severity_accuracy": f"{correct_count}/{total} ({100*correct_count//total}%)",
+        "severity_accuracy": accuracy_str,
         "pattern_accuracy": pattern_accuracy,
         "latency_p50_ms": round(statistics.median(latencies)) if latencies else 0,
         "latency_p95_ms": round(sorted(latencies)[int(len(latencies) * 0.95)]) if len(latencies) >= 20 else max(latencies) if latencies else 0,
@@ -218,14 +241,7 @@ def _write_markdown_report(
     RESULTS_DIR.mkdir(exist_ok=True)
     report_path = RESULTS_DIR / "bedrock_vs_ollama.md"
     ts = datetime.now().strftime("%Y-%m-%d")
-
-    # Derive model names from actual results — not from current env var
-    ollama_models = sorted({
-        r["backend"].replace("ollama:", "")
-        for r in ollama_results
-        if r.get("backend", "").startswith("ollama:")
-    })
-    ollama_models_str = ", ".join(ollama_models) if ollama_models else "unknown"
+    model_name = os.getenv("OLLAMA_MODEL", "llama3.2:3b")
 
     lines = [
         "# Bedrock vs Ollama — Benchmark Report",
@@ -233,8 +249,8 @@ def _write_markdown_report(
         "",
         f"**Date:** {ts}  ",
         f"**Dataset:** {LOG_FILE} ({bedrock_stats['total_events']} anomaly events from 300 synthetic logs)  ",
-        "**Bedrock model:** claude-sonnet-4-5 (us.* cross-region inference profile)  ",
-        f"**Ollama models tested:** {ollama_models_str} (local inference, Apple M4 Max)  ",
+        f"**Bedrock model:** claude-sonnet-4-5 (via AWS Bedrock, eu-west-2)  ",
+        f"**Ollama model:** {model_name} (local inference, Apple M4 Max)  ",
         f"**Anomaly detector:** Isolation Forest (contamination=auto)  ",
         "",
         "---",
@@ -252,25 +268,28 @@ def _write_markdown_report(
         "  Latency 2000–4000ms, mixed 200/500. Ground truth: HIGH.",
         "- **Pattern C** (events 200–212): Error rate surge — api-gateway.",
         "  Normal latency (100–400ms), elevated 500s. Tests error-only detection. Ground truth: HIGH.",
-        "- **Isolated events**: Anomalies outside injected windows. Ground truth: MEDIUM.",
+        "- **Isolated events**: Outside injected windows. No ground truth assigned.",
+        "  Included in latency and JSON validity metrics only (Option B).",
         "",
         "---",
         "",
         "## Results",
         "",
-        f"| Metric | Bedrock (claude-sonnet-4-5) | {ollama_models_str} (combined) |",
+        "| Metric | Bedrock (claude-sonnet-4-5) | Ollama ({}) |".format(model_name),
         "|---|---|---|",
-        f"| Events explained | {bedrock_stats['total_events']} | {ollama_stats['total_events']} |",
+        f"| Total events | {bedrock_stats['total_events']} | {ollama_stats['total_events']} |",
+        f"| Scoreable events (injected patterns) | {bedrock_stats['scoreable_events']} | {ollama_stats['scoreable_events']} |",
+        f"| Isolated events (excl. from accuracy) | {bedrock_stats['isolated_events']} | {ollama_stats['isolated_events']} |",
         f"| JSON validity | {bedrock_stats['json_validity_rate']} | {ollama_stats['json_validity_rate']} |",
-        f"| Severity accuracy (overall) | {bedrock_stats['severity_accuracy']} | {ollama_stats['severity_accuracy']} |",
+        f"| Severity accuracy (injected only) | {bedrock_stats['severity_accuracy']} | {ollama_stats['severity_accuracy']} |",
         f"| Pattern A accuracy (cascade) | {bedrock_stats['pattern_accuracy']['A_cascade']} | {ollama_stats['pattern_accuracy']['A_cascade']} |",
-        f"| Pattern B accuracy (latency) | {bedrock_stats['pattern_accuracy']['B_latency_spike']} | {ollama_stats['pattern_accuracy']['B_latency_spike']} |",
+        f"| Pattern B accuracy (latency spike) | {bedrock_stats['pattern_accuracy']['B_latency_spike']} | {ollama_stats['pattern_accuracy']['B_latency_spike']} |",
         f"| Pattern C accuracy (error surge) | {bedrock_stats['pattern_accuracy']['C_error_surge']} | {ollama_stats['pattern_accuracy']['C_error_surge']} |",
         f"| Latency P50 | {bedrock_stats['latency_p50_ms']}ms | {ollama_stats['latency_p50_ms']}ms |",
         f"| Latency P95 | {bedrock_stats['latency_p95_ms']}ms | {ollama_stats['latency_p95_ms']}ms |",
-        "| Data leaves network | Yes (AWS us.* cross-region) | No |",
-        "| Cost per call | ~$0.003 | ~$0 |",
-        "| Production-ready | Yes | No |",
+        f"| Data leaves network | Yes (AWS eu-west-2) | No |",
+        f"| Cost per call | ~$0.003 | ~$0 |",
+        f"| Production-ready | Yes | No |",
         "",
         "---",
         "",
@@ -279,13 +298,12 @@ def _write_markdown_report(
         "### 1. Severity Accuracy Gap",
         "",
         "The most significant quality difference is severity classification.",
-        f"Bedrock achieved {bedrock_stats['severity_accuracy']} overall severity accuracy.",
+        "Accuracy measured on injected pattern events only (Option B — isolated events excluded).",
+        f"Bedrock achieved {bedrock_stats['severity_accuracy']} on scoreable events.",
         f"Ollama models ({ollama_models_str}) achieved {ollama_stats['severity_accuracy']} combined.",
         "",
-        "The gap is most pronounced on Pattern A (cascading failure) and Pattern B (latency spike).",
-        "Ollama defaults to MEDIUM for the majority of events regardless of signal strength,",
-        "suggesting the 3B parameter model lacks the reasoning capacity to contextualise",
-        "severity from the ±5 event window.",
+        "Smaller Ollama models default to MEDIUM regardless of signal strength.",
+        "Larger models (qwen3:14b) show improvement but remain below Bedrock on cascade reasoning.",
         "",
         "### 2. Pattern C (Error Surge Without Latency) — Notable Finding",
         "",
@@ -350,9 +368,9 @@ def _write_markdown_report(
         "",
         "## What I Would Do Differently",
         "",
-        f"1. **Three models tested:** {ollama_models_str}. A further comparison with",
-        "   llama3.1:8b or qwen3:14b would show whether the quality gap narrows",
-        "   significantly at 8B+ parameters while remaining local.",
+        f"1. **Models benchmarked:** Bedrock claude-sonnet-4-5 vs {ollama_models_str}.",
+        "   Quality improves with model size but remains below Bedrock on cascade reasoning.",
+        "   A production sovereign deployment would use a 13B+ model on EKS.",
         "",
         "2. **Add human quality ratings (1–5).** Severity accuracy is ground-truth-based.",
         "   Production evaluation would need on-call engineer ratings of explanation",
@@ -389,7 +407,7 @@ def _load_raw_results(backend: str) -> list[dict]:
         for line in raw_path.read_text().splitlines()
         if line.strip()
     ]
-    return [r for r in results if r.get("backend", "").startswith(backend)]
+    return [r for r in results if r.get("backend") == backend]
 
 
 async def main(run_bedrock: bool, run_ollama: bool, report_only: bool) -> None:

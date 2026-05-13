@@ -127,7 +127,7 @@ async def trace_explanation(
 
     except Exception as e:
         logger.warning("Langfuse trace failed — pipeline continues: %s", e)
-        yield span_data
+        
     finally:
         try:
             if lf:
