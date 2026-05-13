@@ -102,7 +102,7 @@ to reach production-acceptable latency.
 
 | | Bedrock | EKS self-hosted (vLLM) | Ollama (local dev) |
 |---|---|---|---|
-| GDPR sub-processor | Anthropic | None | None |
+| GDPR sub-processor | AWS | None | None |
 | Data residency | AWS region | Client VPC | Client machine |
 | Audit proof | AWS CloudTrail | VPC Flow Logs | Hard to audit |
 | Model quality | Full Claude Sonnet | Open-source (size-dependent) | Open-source |
@@ -122,7 +122,9 @@ or provisioned throughput in eu-west-2 to guarantee data residency.
 **Use Bedrock when:**
 - Quality and reliability are primary concerns
 - Volume is below ~50M tokens/day
-- Client has signed a DPA with Anthropic
+- AWS's standard DPA (included in AWS Customer Agreement) covers Bedrock usage
+- Client is comfortable with AWS as data processor
+- Client selects an appropriate AWS region for data residency (eu-west-2 for UK)
 
 **Use EKS self-hosted (vLLM) when:**
 - Client has NIS2 obligations (energy, critical infrastructure)
