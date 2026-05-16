@@ -14,7 +14,7 @@ from stream1_log_anomaly.src.models import LogEvent, Explanation
 
 logger = logging.getLogger(__name__)
 
-LOG_PATH = Path("stream1_log_anomaly/results/anomaly_log.jsonl")
+LOG_PATH = Path("results/anomaly_log.jsonl")
 
 
 def append_explanation(

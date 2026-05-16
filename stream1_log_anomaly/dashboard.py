@@ -17,7 +17,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-LOG_PATH = Path("stream1_log_anomaly/results/anomaly_log.jsonl")
+LOG_PATH = Path("results/anomaly_log.jsonl")
 
 st.set_page_config(
     page_title="Log Anomaly Monitor",
