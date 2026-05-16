@@ -42,8 +42,8 @@ Three injected anomaly patterns:
 | Pattern A accuracy (cascade) | 10/10 | 1/10 | 9/10 | 4/10 |
 | Pattern B accuracy (latency spike) | 6/7 | 1/7 | 7/7 | 5/7 |
 | Pattern C accuracy (error surge) | 8/12 | 3/12 | 12/12 | 3/12 |
-| Latency P50 | 5145 | 1239 | 1559 | 28512 |
-| Latency P95 | 6378 | 1542 | 1769 | 53699 |
+| Latency P50 | 5145ms | 1239ms | 1559ms | 28512ms |
+| Latency P95 | 6378ms | 1542ms | 1769ms | 53699ms |
 | Data leaves network | Yes (AWS us.* cross-region) | No | No | No |
 | Cost per call | ~$0.003 | ~$0 | ~$0 | ~$0 |
 | Production-ready | Yes | No | No | No |
@@ -62,9 +62,12 @@ Isolated events — where ground truth is ambiguous — are excluded.
 - **phi4-mini (Ollama)**: 28/29 (96%) overall.
 - **qwen3:14b (Ollama)**: 12/29 (41%) overall.
 
-Smaller local models default to MEDIUM regardless of signal strength.
-Larger models (qwen3:14b) show improvement but remain below Bedrock
-on cascade reasoning — Pattern A requires multi-event context synthesis.
+phi4-mini (3.8B) outperforms both Bedrock and qwen3:14b on this task,
+suggesting instruction-tuning quality matters more than parameter count
+for structured JSON extraction and severity classification.
+llama3.2:3b defaults to MEDIUM regardless of signal strength.
+qwen3:14b results are partially invalidated by token budget issues — see
+JSON Reliability section for details.
 
 ### 2. Pattern C — Error Surge Without Latency
 
@@ -95,6 +98,13 @@ to reach production-acceptable latency.
 - **llama3.2:3b (Ollama)**: 49/49 (100%).
 - **phi4-mini (Ollama)**: 49/49 (100%).
 - **qwen3:14b (Ollama)**: 25/49 (51%).
+
+**Note on qwen3:14b results:** qwen3:14b uses extended chain-of-thought reasoning
+by default, which consumed the 512-token prediction budget before completing JSON
+output on 24/49 calls. Results rerun with `OLLAMA_NUM_PREDICT=1024` reduced failures
+but did not eliminate them. qwen3:14b accuracy (41%) and JSON validity (51%) should
+be considered indicative only. A production deployment would set `thinking: false`
+in Ollama options or use a dedicated instruction-tuned variant without thinking mode.
 
 ---
 
