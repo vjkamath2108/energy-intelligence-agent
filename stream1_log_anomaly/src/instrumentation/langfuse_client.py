@@ -76,7 +76,7 @@ async def trace_explanation(
     backend: str,
     prompt: str,
     model: str | None = None,
-) -> AsyncIterator[dict]:
+) -> AsyncIterator[dict[str, object]]:
     """
     Async context manager that records one anomaly explanation as a Langfuse
     generation observation (Langfuse SDK v4).
@@ -97,7 +97,7 @@ async def trace_explanation(
                Defaults to backend name if not provided.
     """
     lf = get_langfuse()
-    span_data: dict = {}
+    span_data: dict[str,object] = {}
     model_label = model or backend
 
     if lf is None:
@@ -117,13 +117,11 @@ async def trace_explanation(
                 "backend": backend,
             },
         ) as generation:
-            generation.set_trace_io(input=prompt)
 
             yield span_data  # caller fills span_data["output"]
 
             if "output" in span_data:
                 generation.update(output=span_data["output"])
-                generation.set_trace_io(output=span_data["output"])
 
     except Exception as e:
         logger.warning("Langfuse trace failed — pipeline continues: %s", e)

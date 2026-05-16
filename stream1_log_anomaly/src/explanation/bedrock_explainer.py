@@ -16,11 +16,11 @@ import json
 import logging
 import os
 import time
-from typing import Any
+from typing import Any,cast
 
 import asyncio
-import boto3
-from botocore.exceptions import ClientError
+import boto3 # type: ignore[import-untyped]
+from botocore.exceptions import ClientError # type: ignore[import-untyped]
 from pydantic import ValidationError
 
 from stream1_log_anomaly.src.models import LogEvent, Explanation
@@ -68,7 +68,8 @@ def _call_bedrock_sync(client: Any, prompt: str) -> str:
                 body=json.dumps(body),
             )
             raw = json.loads(response["body"].read())
-            return raw["content"][0]["text"]
+            return cast(str, raw["content"][0]["text"])
+
 
         except ClientError as e:
             error_code = e.response["Error"]["Code"]

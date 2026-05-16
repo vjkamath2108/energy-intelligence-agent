@@ -75,7 +75,7 @@ The centrepiece alone leaves four questions unanswered. The streams answer them.
 │  ┌─────────────────────────────────────────────────────────────────┐    │
 │  │  STREAM 2 — Sovereign Inference                                 │    │
 │  │                                                                 │    │
-│  │  Calling Anthropic's API makes Anthropic a GDPR sub-processor.  │    │
+│  │  Calling Bedrock makes AWS a GDPR data processor. Under NIS2,    │    │
 │  │  Under NIS2, an external inference endpoint is a supply chain   │    │
 │  │  dependency. Some clients cannot accept either.                 │    │
 │  │                                                                 │    │
@@ -145,9 +145,10 @@ The centrepiece alone leaves four questions unanswered. The streams answer them.
                     └─────────────────────┘
 ```
 
-Cost crossover: at ~50M tokens/day, EKS self-hosting becomes cheaper
-than Bedrock when factoring infrastructure against per-token cost.
-Below that threshold, Bedrock wins on total cost of ownership.
+Cost crossover: EKS self-hosting becomes cheaper than Bedrock at a volume
+that depends on your model choice, node utilisation, and engineering overhead.
+See [results/bedrock_vs_ollama.md](results/bedrock_vs_ollama.md) for the
+decision framework and how to calculate the crossover for your specific context.
 
 ---
 
@@ -277,7 +278,8 @@ complexity: generating DPO preference pairs in Stream 4.
 | [SAFETY.md](docs/SAFETY.md) | Responsible AI mechanisms |
 | [VECTOR_DB_ANALYSIS.md](docs/VECTOR_DB_ANALYSIS.md) | pgvector vs alternatives |
 | [CHUNKING_STRATEGY.md](docs/CHUNKING_STRATEGY.md) | Chunking approach |
-| [results/bedrock_vs_ollama.md](results/bedrock_vs_ollama.md) | Inference benchmark |
+| [SOVEREIGN_INFERENCE.md](docs/SOVEREIGN_INFERENCE.md) | Data sovereignty decision framework |
+| [results/bedrock_vs_ollama.md](results/bedrock_vs_ollama.md) | Four-model inference benchmark (Bedrock, llama3.2:3b, phi4-mini, qwen3:14b) |
 
 ---
 

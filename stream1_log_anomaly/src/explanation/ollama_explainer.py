@@ -140,7 +140,7 @@ class OllamaExplainer:
             OLLAMA_BASE_URL,
         )
 
-    async def _call_ollama(self, prompt: str) -> tuple[str, bool]:
+    async def _call_ollama(self, prompt: str) -> str:
         """
         Call local Ollama API and return raw text response.
 
@@ -172,7 +172,7 @@ class OllamaExplainer:
                 OLLAMA_MODEL,
                 raw[:120].replace("\n", " "),
             )
-            return raw, False
+            return raw
         except httpx.TimeoutException as e:
             raise RuntimeError(
                 f"Ollama call timed out after {OLLAMA_TIMEOUT_S}s "
@@ -206,6 +206,7 @@ class OllamaExplainer:
         prompt = build_prompt(anomalous_event, context_events)
         start = time.monotonic()
         is_retry = False
+        elapsed_ms = 0.0  # ← add this line
 
         async with trace_explanation(
             service=anomalous_event.service,
@@ -215,7 +216,7 @@ class OllamaExplainer:
             model=OLLAMA_MODEL,
             prompt=prompt,
         ) as span:
-            raw, _ = await self._call_ollama(prompt)
+            raw = await self._call_ollama(prompt)
 
             try:
                 explanation = _parse_explanation(raw)
@@ -230,7 +231,7 @@ class OllamaExplainer:
                     + "\n\nCRITICAL: Return ONLY a valid JSON object. "
                     "No markdown. No explanation. No text before or after the JSON."
                 )
-                raw, _ = await self._call_ollama(strict_prompt)
+                raw = await self._call_ollama(strict_prompt)
                 try:
                     explanation = _parse_explanation(raw)
                 except ValueError as e:

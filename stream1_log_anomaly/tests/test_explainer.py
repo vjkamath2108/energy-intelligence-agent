@@ -70,7 +70,7 @@ async def test_bedrock_retries_on_invalid_json() -> None:
 async def test_ollama_explain_returns_explanation() -> None:
     explainer = OllamaExplainer()
     with patch(
-        "stream1_log_anomaly.src.explanation.ollama_explainer._call_ollama",
+        "stream1_log_anomaly.src.explanation.ollama_explainer.OllamaExplainer._call_ollama",
         new=AsyncMock(return_value=VALID_EXPLANATION_JSON),
     ):
         result = await explainer.explain(make_event(), [make_event()])
@@ -83,7 +83,7 @@ async def test_ollama_explain_returns_explanation() -> None:
 async def test_ollama_retries_on_invalid_json() -> None:
     explainer = OllamaExplainer()
     with patch(
-        "stream1_log_anomaly.src.explanation.ollama_explainer._call_ollama",
+        "stream1_log_anomaly.src.explanation.ollama_explainer.OllamaExplainer._call_ollama",
         new=AsyncMock(side_effect=[
             "not valid json",
             VALID_EXPLANATION_JSON,
@@ -109,7 +109,7 @@ async def test_bedrock_and_ollama_return_same_schema() -> None:
         bedrock_result = await bedrock.explain(make_event(), [])
 
     with patch(
-        "stream1_log_anomaly.src.explanation.ollama_explainer._call_ollama",
+        "stream1_log_anomaly.src.explanation.ollama_explainer.OllamaExplainer._call_ollama",
         new=AsyncMock(return_value=VALID_EXPLANATION_JSON),
     ):
         ollama_result = await ollama.explain(make_event(), [])

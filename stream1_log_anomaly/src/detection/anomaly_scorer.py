@@ -18,7 +18,7 @@ Design decisions:
 import logging
 from dataclasses import dataclass, field
 
-from sklearn.ensemble import IsolationForest  # type: ignore[import]
+from sklearn.ensemble import IsolationForest  # type: ignore[import-untyped]
 import numpy as np
 from stream1_log_anomaly.src.models import LogEvent
 
