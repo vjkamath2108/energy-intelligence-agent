@@ -246,3 +246,12 @@ venv/
 *.log
 
 .env
+
+# Terraform
+**/.terraform/
+**/.terraform.lock.hcl
+**/terraform.tfstate
+**/terraform.tfstate.backup
+**/terraform.tfstate.*.backup
+# tfvars can contain credentials — commit a .example instead
+infra/terraform.tfvars
