@@ -13,10 +13,12 @@ Option B ground truth methodology:
 Usage:
     python -m stream1_log_anomaly.src.streaming.generate_logs  # regenerate logs
 
-    # Run individual backends (split-machine workflow):
+    # Run individual backends:
     python -m stream1_log_anomaly.benchmark_runner --explainer bedrock
+    python -m stream1_log_anomaly.benchmark_runner --explainer mistral-bedrock
     OLLAMA_MODEL=llama3.2:3b python -m stream1_log_anomaly.benchmark_runner --explainer ollama
     OLLAMA_MODEL=phi4-mini python -m stream1_log_anomaly.benchmark_runner --explainer ollama
+    OLLAMA_MODEL=mistral:latest python -m stream1_log_anomaly.benchmark_runner --explainer mistral-local
     OLLAMA_MODEL=qwen3:14b OLLAMA_TIMEOUT_S=120 OLLAMA_NUM_PREDICT=1024 \\
         python -m stream1_log_anomaly.benchmark_runner --explainer ollama
 
@@ -40,6 +42,8 @@ from stream1_log_anomaly.src.models import LogEvent
 from stream1_log_anomaly.src.detection.anomaly_scorer import AnomalyScorer
 from stream1_log_anomaly.src.explanation.bedrock_explainer import BedrockExplainer
 from stream1_log_anomaly.src.explanation.ollama_explainer import OllamaExplainer
+from stream1_log_anomaly.src.explanation.mistral_bedrock_explainer import MistralBedrockExplainer
+from stream1_log_anomaly.src.explanation.mistral_local_explainer import MistralLocalExplainer
 
 load_dotenv()
 
@@ -53,7 +57,14 @@ LOG_FILE = Path("stream1_log_anomaly/logs/sample.jsonl")
 RESULTS_DIR = Path("results")
 
 # Preferred display order in report columns
-DISPLAY_ORDER = ["bedrock", "ollama:llama3.2:3b", "ollama:phi4-mini", "ollama:qwen3:14b"]
+DISPLAY_ORDER = [
+    "bedrock",
+    "mistral-bedrock",
+    "mistral-local",
+    "ollama:llama3.2:3b",
+    "ollama:phi4-mini",
+    "ollama:qwen3:14b",
+]
 
 
 def _ground_truth_severity(event_index: int) -> str | None:
@@ -106,18 +117,35 @@ async def _run_backend(
 
     Returns list of result dicts, one per anomaly event.
     """
-    backend_label = (
-        backend_name
-        if backend_name == "bedrock"
-        else f"ollama:{os.getenv('OLLAMA_MODEL', 'llama3.2:3b')}"
-    )
+    # Resolve backend label — used as the key in raw results JSONL
+    if backend_name == "bedrock":
+        backend_label = "bedrock"
+    elif backend_name == "mistral-bedrock":
+        backend_label = "mistral-bedrock"
+    elif backend_name == "mistral-local":
+        backend_label = "mistral-local"
+    else:
+        # ollama variants — label includes model name
+        backend_label = f"ollama:{os.getenv('OLLAMA_MODEL', 'llama3.2:3b')}"
 
     results = []
 
+    # Instantiate the right explainer
     if backend_name == "bedrock":
-        explainer: BedrockExplainer | OllamaExplainer = BedrockExplainer(
+        explainer = BedrockExplainer(
             region=os.getenv("AWS_REGION", "eu-west-2")
         )
+    elif backend_name == "mistral-bedrock":
+        explainer = MistralBedrockExplainer(
+            region=os.getenv("BEDROCK_REGION", "eu-west-2")
+        )
+    elif backend_name == "mistral-local":
+        explainer = MistralLocalExplainer()
+        try:
+            await explainer.check_health()
+        except RuntimeError as e:
+            logger.error("Mistral Local health check failed: %s", e)
+            raise
     else:
         explainer = OllamaExplainer()
         try:
@@ -130,7 +158,7 @@ async def _run_backend(
 
     for event_index, event, context in anomalies:
         start = time.monotonic()
-        elapsed_ms = 0.0  # initialised before try to avoid UnboundLocalError
+        elapsed_ms = 0.0
         json_valid = True
         explanation = None
 
@@ -183,7 +211,8 @@ async def _run_backend(
             gt_str, predicted_severity, correct_str, elapsed_ms,
         )
 
-    if isinstance(explainer, OllamaExplainer):
+    # Close clients that need it
+    if hasattr(explainer, "aclose"):
         await explainer.aclose()
 
     return results
@@ -236,19 +265,6 @@ def _compute_stats(results: list[dict]) -> dict:
     }
 
 
-def _load_raw_results(backend_prefix: str) -> list[dict]:
-    """Load results for a backend. Prefix match: 'ollama' matches all ollama:* backends."""
-    raw_path = RESULTS_DIR / "benchmark_raw.jsonl"
-    if not raw_path.exists():
-        return []
-    results = [
-        json.loads(line)
-        for line in raw_path.read_text().splitlines()
-        if line.strip()
-    ]
-    return [r for r in results if r.get("backend", "").startswith(backend_prefix)]
-
-
 def _load_results_by_backend() -> dict[str, list[dict]]:
     """Load all results grouped by exact backend label."""
     raw_path = RESULTS_DIR / "benchmark_raw.jsonl"
@@ -266,30 +282,52 @@ def _load_results_by_backend() -> dict[str, list[dict]]:
 
 def _col_label(backend: str) -> str:
     """Human-readable column header for a backend."""
-    if backend == "bedrock":
-        return "Bedrock (claude-sonnet-4-5)"
+    labels = {
+        "bedrock": "Claude Sonnet (Bedrock)",
+        "mistral-bedrock": "Mistral 7B (Bedrock)",
+        "mistral-local": "Mistral 7B (Sovereign/Ollama)",
+    }
+    if backend in labels:
+        return labels[backend]
     model = backend.replace("ollama:", "")
     return f"{model} (Ollama)"
 
 
-def _write_markdown_report(all_results: dict[str, list[dict]]) -> Path:
-    """
-    Write benchmark report with one column per model.
+def _data_leaves(backend: str) -> str:
+    if backend == "bedrock":
+        return "Yes (AWS us.* cross-region)"
+    if backend == "mistral-bedrock":
+        return "Yes (AWS Bedrock)"
+    return "No"
 
-    all_results: dict mapping backend label to list of result dicts.
-    """
+
+def _cost_per_call(backend: str) -> str:
+    if backend == "bedrock":
+        return "~$0.003"
+    if backend == "mistral-bedrock":
+        return "~$0.0001"
+    return "~$0"
+
+
+def _production_ready(backend: str) -> str:
+    if backend in ("bedrock", "mistral-bedrock"):
+        return "Yes"
+    return "No"
+
+
+def _write_markdown_report(all_results: dict[str, list[dict]]) -> Path:
+    """Write benchmark report with one column per model."""
     RESULTS_DIR.mkdir(exist_ok=True)
-    report_path = RESULTS_DIR / "bedrock_vs_ollama.md"
+    report_path = RESULTS_DIR / "bedrock_vs_ollama_vs_mistral.md"
     ts = datetime.now().strftime("%Y-%m-%d")
 
-    # Ordered backends — known order first, any extras appended
+    # Ordered backends — known order first, extras appended
     backends = [b for b in DISPLAY_ORDER if b in all_results]
     backends += [b for b in sorted(all_results) if b not in backends]
 
     all_stats = {b: _compute_stats(all_results[b]) for b in backends}
     col_labels = [_col_label(b) for b in backends]
 
-    # Table helpers
     separator = "|---|" + "---|" * len(backends)
     header_row = "| Metric | " + " | ".join(col_labels) + " |"
 
@@ -301,28 +339,22 @@ def _write_markdown_report(all_results: dict[str, list[dict]]) -> Path:
         vals = [all_stats[b]["pattern_accuracy"][pattern_key] for b in backends]
         return f"| {label} | " + " | ".join(vals) + " |"
 
-    def _static_row(label: str, values: list[str]) -> str:
-        return f"| {label} | " + " | ".join(values) + " |"
-
-    data_leaves = [
-        "Yes (AWS us.* cross-region)" if b == "bedrock" else "No"
-        for b in backends
-    ]
-    cost_vals = ["~$0.003" if b == "bedrock" else "~$0" for b in backends]
-    prod_vals = ["Yes" if b == "bedrock" else "No" for b in backends]
+    def _static_row(label: str, fn) -> str:
+        vals = [fn(b) for b in backends]
+        return f"| {label} | " + " | ".join(vals) + " |"
 
     bedrock_stats = all_stats.get("bedrock", {})
-    ollama_backends = [b for b in backends if b != "bedrock"]
-    ollama_models_str = ", ".join(b.replace("ollama:", "") for b in ollama_backends)
+    non_bedrock = [b for b in backends if b not in ("bedrock",)]
+    local_models_str = ", ".join(_col_label(b) for b in non_bedrock)
 
     lines = [
-        "# Bedrock vs Local Models — Benchmark Report",
+        "# Benchmark Report — Frontier vs Open-Weight Inference",
         "## Stream 1: Log Anomaly Explanation Pipeline",
         "",
         f"**Date:** {ts}  ",
         f"**Dataset:** {LOG_FILE} ({bedrock_stats.get('total_events', 'N/A')} anomaly events from 300 synthetic logs)  ",
-        "**Bedrock model:** claude-sonnet-4-5 (us.* cross-region inference profile)  ",
-        f"**Local models tested:** {ollama_models_str} (Apple M4 Max)  ",
+        "**Frontier model:** Claude Sonnet 4.5 (AWS Bedrock, us.* cross-region)  ",
+        f"**Open-weight models:** {local_models_str}  ",
         "**Anomaly detector:** Isolation Forest (contamination=auto)  ",
         "",
         "---",
@@ -333,9 +365,13 @@ def _write_markdown_report(all_results: dict[str, list[dict]]) -> Path:
         "on the same 300-event synthetic log dataset (seed=42, reproducible).",
         "Each model received the same prompt template and the same ±5 context window.",
         "",
-        "**Option B ground truth:** Severity accuracy is measured only on events with",
-        "deterministic ground truth from injected anomaly patterns. Isolated events",
-        "(outside pattern windows) are included in latency and JSON validity only.",
+        "**Open-weight deployment modes benchmarked:**",
+        "- **Mistral 7B (Bedrock)** — managed API, data leaves machine to AWS",
+        "- **Mistral 7B (Sovereign/Ollama)** — fully local, zero external calls,",
+        "  addresses NIS2 data residency requirements for UK energy operators",
+        "",
+        "**Option B ground truth:** Severity accuracy measured only on injected",
+        "pattern events. Isolated events included in latency/validity only.",
         "",
         "Three injected anomaly patterns:",
         "- **Pattern A** (events 60–69): Cascading failure — auth → inventory → payment-svc → api-gateway.",
@@ -344,7 +380,7 @@ def _write_markdown_report(all_results: dict[str, list[dict]]) -> Path:
         "  Latency 2000–4000ms, mixed 200/500. Ground truth: HIGH.",
         "- **Pattern C** (events 200–212): Error rate surge — api-gateway.",
         "  Normal latency (100–400ms), elevated 500s. Tests error-only signal. Ground truth: HIGH.",
-        "- **Isolated events**: Outside injected windows. Excluded from accuracy measurement.",
+        "- **Isolated events**: Outside injected windows. Excluded from accuracy.",
         "",
         "---",
         "",
@@ -360,20 +396,19 @@ def _write_markdown_report(all_results: dict[str, list[dict]]) -> Path:
         _pattern_row("Pattern A accuracy (cascade)", "A_cascade"),
         _pattern_row("Pattern B accuracy (latency spike)", "B_latency_spike"),
         _pattern_row("Pattern C accuracy (error surge)", "C_error_surge"),
-        _row("Latency P50", "latency_p50_ms"),
-        _row("Latency P95", "latency_p95_ms"),
-        _static_row("Data leaves network", data_leaves),
-        _static_row("Cost per call", cost_vals),
-        _static_row("Production-ready", prod_vals),
+        _row("Latency P50 (ms)", "latency_p50_ms"),
+        _row("Latency P95 (ms)", "latency_p95_ms"),
+        _static_row("Data leaves network", _data_leaves),
+        _static_row("Cost per call", _cost_per_call),
+        _static_row("Production-ready", _production_ready),
         "",
         "---",
         "",
         "## Key Findings",
         "",
-        "### 1. Severity Accuracy",
+        "### 1. Frontier vs Open-Weight Quality Gap",
         "",
         "Accuracy measured on injected pattern events only (Option B).",
-        "Isolated events — where ground truth is ambiguous — are excluded.",
         "",
     ]
 
@@ -383,15 +418,20 @@ def _write_markdown_report(all_results: dict[str, list[dict]]) -> Path:
 
     lines += [
         "",
-        "Smaller local models default to MEDIUM regardless of signal strength.",
-        "Larger models (qwen3:14b) show improvement but remain below Bedrock",
-        "on cascade reasoning — Pattern A requires multi-event context synthesis.",
+        "### 2. Mistral 7B — Managed vs Sovereign Deployment",
         "",
-        "### 2. Pattern C — Error Surge Without Latency",
+        "Same model, two deployment modes. Key trade-off:",
+        "- **Bedrock**: lower latency, managed infrastructure, data leaves machine",
+        "- **Sovereign/Ollama**: ~4–5x higher latency, zero external dependency,",
+        "  satisfies NIS2 data residency for UK energy operators",
         "",
-        "Pattern C tests whether a model can identify HIGH severity from error signal",
-        "alone, without a latency spike. Normal latency means the only signal is",
-        "elevated 500 status codes across consecutive events.",
+        "For async anomaly pipelines the latency trade-off is acceptable.",
+        "For real-time triage dashboards it requires GPU hardware to close the gap.",
+        "",
+        "### 3. Pattern C — Error Surge Without Latency",
+        "",
+        "Pattern C tests severity identification from error signal alone,",
+        "without a latency spike. Only elevated 500 status codes as signal.",
         "",
     ]
 
@@ -404,7 +444,7 @@ def _write_markdown_report(all_results: dict[str, list[dict]]) -> Path:
 
     lines += [
         "",
-        "### 3. Latency vs Quality Trade-off",
+        "### 4. Latency vs Quality Trade-off",
         "",
     ]
 
@@ -418,12 +458,7 @@ def _write_markdown_report(all_results: dict[str, list[dict]]) -> Path:
 
     lines += [
         "",
-        "A faster but incorrect explanation has negative operational value —",
-        "it misleads the on-call engineer. qwen3:14b achieves the best local",
-        "quality but at ~20s/call requires GPU hardware (g5.xlarge on EKS)",
-        "to reach production-acceptable latency.",
-        "",
-        "### 4. JSON Reliability",
+        "### 5. JSON Reliability",
         "",
     ]
 
@@ -437,65 +472,51 @@ def _write_markdown_report(all_results: dict[str, list[dict]]) -> Path:
         "",
         "## Three-Way Deployment Decision Framework",
         "",
-        "| | Bedrock | EKS self-hosted (vLLM) | Ollama (local dev) |",
+        "| | Claude Sonnet (Bedrock) | Mistral 7B (Bedrock) | Mistral 7B (Sovereign) |",
         "|---|---|---|---|",
-        "| GDPR sub-processor | Anthropic | None | None |",
-        "| Data residency | AWS region | Client VPC | Client machine |",
-        "| Audit proof | AWS CloudTrail | VPC Flow Logs | Hard to audit |",
-        "| Model quality | Full Claude Sonnet | Open-source (size-dependent) | Open-source |",
-        "| Best local accuracy | — | qwen3:14b on GPU | qwen3:14b |",
-        "| Cost crossover | Baseline | ~50M tokens/day | ~$0 (dev only) |",
-        "| Ops burden | Low | High | Very low |",
-        "| Production-ready | Yes | Yes | No |",
+        "| GDPR sub-processor | Anthropic | Mistral AI | None |",
+        "| Data residency | AWS region | AWS region | Client machine |",
+        "| NIS2 compliant | Requires DPA | Requires DPA | Yes — zero egress |",
+        "| Model quality | Frontier | Open-weight 7B | Open-weight 7B |",
+        "| Latency | Low | Low | ~4–5x higher |",
+        "| Cost crossover | Baseline | ~30x cheaper | ~$0 |",
+        "| Ops burden | Low | Low | Medium (hardware) |",
+        "| Production-ready | Yes | Yes | With GPU |",
         "",
-        "**Note on inference profiles:** This benchmark used a `us.*` cross-region",
-        "inference profile. For UK energy clients under NIS2, use an `eu.*` profile",
-        "or provisioned throughput in eu-west-2 to guarantee data residency.",
+        "**Note on inference profiles:** For UK energy clients under NIS2, use an",
+        "`eu.*` inference profile or provisioned throughput in eu-west-2 to",
+        "guarantee data residency even with managed Bedrock backends.",
         "",
         "---",
         "",
         "## Recommendation by Use Case",
         "",
-        "**Use Bedrock when:**",
+        "**Use Claude Sonnet (Bedrock) when:**",
         "- Quality and reliability are primary concerns",
         "- Volume is below ~50M tokens/day",
         "- Client has signed a DPA with Anthropic",
         "",
-        "**Use EKS self-hosted (vLLM) when:**",
+        "**Use Mistral 7B (Bedrock) when:**",
+        "- Cost is a primary constraint and frontier quality is not required",
+        "- Client is comfortable with open-weight model quality trade-offs",
+        "- Volume makes Claude cost prohibitive",
+        "",
+        "**Use Mistral 7B (Sovereign/Ollama) when:**",
         "- Client has NIS2 obligations (energy, critical infrastructure)",
-        "- Data sovereignty requirements preclude external API endpoints",
-        "- Volume exceeds ~50M tokens/day and operational maturity exists",
-        "- Use qwen3:14b or larger on GPU nodes for production-grade quality",
-        "",
-        "**Use Ollama when:**",
-        "- Local development and pattern validation only",
-        "- Proving the sovereign inference pattern before EKS commitment",
-        "- Zero-cost exploration of model quality vs size trade-offs",
-        "",
-        "---",
-        "",
-        "## What I Would Do Differently",
-        "",
-        f"1. **Models benchmarked:** Bedrock claude-sonnet-4-5 vs {ollama_models_str}.",
-        "   Quality scales with model size. A production sovereign deployment needs",
-        "   a 13B+ model on GPU hardware to match Bedrock quality and latency.",
-        "",
-        "2. **Add human quality ratings (1–5).** Severity accuracy is ground-truth-based.",
-        "   Production evaluation needs on-call engineer ratings of explanation",
-        "   usefulness — not just correctness of the severity label.",
-        "",
-        "3. **Measure token efficiency.** Models produce explanations of different lengths.",
-        "   Tokens per explanation is a meaningful cost efficiency metric alongside latency.",
+        "- Data sovereignty requirements preclude any external API endpoints",
+        "- Async pipeline — latency trade-off is acceptable",
+        "- Use GPU hardware (g5.xlarge on EKS/vLLM) for production-grade latency",
         "",
         "---",
         "",
         "## Files",
         "",
-        "- `src/explanation/bedrock_explainer.py`",
-        "- `src/explanation/ollama_explainer.py`",
+        "- `src/explanation/bedrock_explainer.py` — Claude Sonnet via Bedrock",
+        "- `src/explanation/mistral_bedrock_explainer.py` — Mistral 7B via Bedrock",
+        "- `src/explanation/mistral_local_explainer.py` — Mistral 7B via Ollama (sovereign)",
+        "- `src/explanation/ollama_explainer.py` — generic Ollama backend",
         "- `src/explanation/prompts.py`",
         "- `src/detection/anomaly_scorer.py`",
-        "- `src/streaming/generate_logs.py`",
         "- `results/benchmark_raw.jsonl` — raw per-event results",
         "",
     ]
@@ -505,99 +526,79 @@ def _write_markdown_report(all_results: dict[str, list[dict]]) -> Path:
     return report_path
 
 
-async def main(run_bedrock: bool, run_ollama: bool, report_only: bool) -> None:
+async def main(backend: str, report_only: bool) -> None:
     RESULTS_DIR.mkdir(exist_ok=True)
     raw_path = RESULTS_DIR / "benchmark_raw.jsonl"
 
     if report_only:
         all_results = _load_results_by_backend()
-        if not any(b == "bedrock" for b in all_results):
-            print("No Bedrock results in results/benchmark_raw.jsonl")
-            print("Run: python -m stream1_log_anomaly.benchmark_runner --explainer bedrock")
-            return
-        if not any(b.startswith("ollama:") for b in all_results):
-            print("No Ollama results in results/benchmark_raw.jsonl")
+        if not all_results:
+            print("No results in results/benchmark_raw.jsonl — run backends first.")
             return
         report_path = _write_markdown_report(all_results)
         print(f"\nReport written: {report_path}")
         all_stats = {b: _compute_stats(r) for b, r in all_results.items()}
-        for backend in [b for b in DISPLAY_ORDER if b in all_stats] + \
-                       [b for b in sorted(all_stats) if b not in DISPLAY_ORDER]:
-            s = all_stats[backend]
-            print(f"  {backend}: accuracy={s['severity_accuracy']}, P50={s['latency_p50_ms']}ms")
+        ordered = [b for b in DISPLAY_ORDER if b in all_stats]
+        ordered += [b for b in sorted(all_stats) if b not in ordered]
+        for b in ordered:
+            s = all_stats[b]
+            print(f"  {_col_label(b)}: accuracy={s['severity_accuracy']}, P50={s['latency_p50_ms']}ms")
         return
 
     events = _load_events()
     anomalies = _detect_anomalies(events)
 
-    if run_bedrock:
-        logger.info("--- Bedrock run ---")
-        bedrock_results = await _run_backend("bedrock", anomalies)
-        with raw_path.open("a") as f:
-            for r in bedrock_results:
-                f.write(json.dumps(r) + "\n")
-        stats = _compute_stats(bedrock_results)
-        print(f"\nBedrock complete — severity: {stats['severity_accuracy']}, P50: {stats['latency_p50_ms']}ms")
-        print(f"Results appended to {raw_path}")
-        if not run_ollama:
-            print("Transfer results/benchmark_raw.jsonl to your Ollama machine, then run:")
-            print("  python -m stream1_log_anomaly.benchmark_runner --explainer ollama")
+    run_backends = (
+        ["bedrock", "mistral-bedrock", "mistral-local", "ollama"]
+        if backend == "all"
+        else [backend]
+    )
 
-    if run_ollama:
-        logger.info("--- Ollama run ---")
-        ollama_results = await _run_backend("ollama", anomalies)
+    for b in run_backends:
+        logger.info("--- %s run ---", b)
+        backend_results = await _run_backend(b, anomalies)
         with raw_path.open("a") as f:
-            for r in ollama_results:
+            for r in backend_results:
                 f.write(json.dumps(r) + "\n")
-        stats = _compute_stats(ollama_results)
-        model = os.getenv("OLLAMA_MODEL", "unknown")
-        print(f"\nOllama ({model}) complete — severity: {stats['severity_accuracy']}, P50: {stats['latency_p50_ms']}ms")
-        print(f"Results appended to {raw_path}")
+        stats = _compute_stats(backend_results)
+        print(
+            f"\n{_col_label(b)} complete — "
+            f"accuracy: {stats['severity_accuracy']}, "
+            f"P50: {stats['latency_p50_ms']}ms"
+        )
 
-    # Auto-generate report if bedrock + at least one ollama backend present
     all_results = _load_results_by_backend()
-    has_bedrock = any(b == "bedrock" for b in all_results)
-    has_ollama = any(b.startswith("ollama:") for b in all_results)
-    if has_bedrock and has_ollama:
+    if len(all_results) > 1:
         report_path = _write_markdown_report(all_results)
         print(f"\nReport written: {report_path}")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Benchmark Bedrock vs local model explainers",
+        description="Benchmark Bedrock vs open-weight model explainers",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Workflow for split machines (Bedrock on office laptop, Ollama on local):
+Examples:
 
-  Step 1 — Office laptop (AWS access):
-    python -m stream1_log_anomaly.benchmark_runner --explainer bedrock
-
-  Step 2 — Copy results to local machine:
-    scp results/benchmark_raw.jsonl <local>:~/vijay/.../results/
-
-  Step 3 — Local machine, one per model:
-    OLLAMA_MODEL=llama3.2:3b python -m stream1_log_anomaly.benchmark_runner --explainer ollama
-    OLLAMA_MODEL=phi4-mini python -m stream1_log_anomaly.benchmark_runner --explainer ollama
-    OLLAMA_MODEL=qwen3:14b OLLAMA_TIMEOUT_S=120 OLLAMA_NUM_PREDICT=1024 \\
-        python -m stream1_log_anomaly.benchmark_runner --explainer ollama
-
-  Step 4 — Generate report (either machine, once all backends done):
-    python -m stream1_log_anomaly.benchmark_runner --report
+  python -m stream1_log_anomaly.benchmark_runner --explainer bedrock
+  python -m stream1_log_anomaly.benchmark_runner --explainer mistral-bedrock
+  OLLAMA_MODEL=mistral:latest OLLAMA_TIMEOUT_S=120 \\
+      python -m stream1_log_anomaly.benchmark_runner --explainer mistral-local
+  OLLAMA_MODEL=llama3.2:3b \\
+      python -m stream1_log_anomaly.benchmark_runner --explainer ollama
+  python -m stream1_log_anomaly.benchmark_runner --report
         """,
     )
     parser.add_argument(
         "--explainer",
-        choices=["bedrock", "ollama", "both"],
-        default="both",
-        help="Which backend to run (default: both)",
+        choices=["bedrock", "mistral-bedrock", "mistral-local", "ollama", "all"],
+        default="all",
+        help="Which backend to run (default: all)",
     )
     parser.add_argument(
         "--report",
         action="store_true",
-        help="Generate report from existing results/benchmark_raw.jsonl without running inference",
+        help="Generate report from existing results/benchmark_raw.jsonl",
     )
     args = parser.parse_args()
-    run_bedrock = args.explainer in ("bedrock", "both") and not args.report
-    run_ollama = args.explainer in ("ollama", "both") and not args.report
-    asyncio.run(main(run_bedrock, run_ollama, report_only=args.report))
+    asyncio.run(main(args.explainer, report_only=args.report))

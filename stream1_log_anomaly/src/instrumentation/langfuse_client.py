@@ -22,13 +22,22 @@ v4 API notes:
 
 import logging
 import os
-from contextlib import asynccontextmanager
-from typing import AsyncIterator
 
 from dotenv import load_dotenv
-from langfuse import Langfuse
 
 load_dotenv()
+
+# Suppress Langfuse OTEL exporter noise when keys are not configured.
+# The SDK registers a background exporter at import time regardless of
+# whether it is initialised — this env var disables it cleanly before
+# the Langfuse import fires.
+if not os.getenv("LANGFUSE_PUBLIC_KEY") or not os.getenv("LANGFUSE_SECRET_KEY"):
+    os.environ["OTEL_SDK_DISABLED"] = "true"
+
+from contextlib import asynccontextmanager  # noqa: E402
+from typing import AsyncIterator  # noqa: E402
+
+from langfuse import Langfuse  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -36,16 +45,16 @@ _langfuse: Langfuse | None = None
 
 
 def get_langfuse() -> Langfuse | None:
-    """
-    Return the shared Langfuse instance, initialising it on first call.
-
-    Returns None if keys are not configured or initialisation fails —
-    callers must handle None gracefully.
-    """
     global _langfuse
 
     if _langfuse is not None:
         return _langfuse
+
+    # Explicit kill switch — set LANGFUSE_ENABLED=false to disable tracing
+    # without removing keys from .env
+    if os.getenv("LANGFUSE_ENABLED", "true").lower() == "false":
+        logger.info("Langfuse disabled via LANGFUSE_ENABLED=false.")
+        return None
 
     public_key = os.getenv("LANGFUSE_PUBLIC_KEY")
     secret_key = os.getenv("LANGFUSE_SECRET_KEY")
@@ -66,7 +75,6 @@ def get_langfuse() -> Langfuse | None:
     except Exception as e:
         logger.warning("Langfuse init failed — tracing disabled: %s", e)
         return None
-
 
 @asynccontextmanager
 async def trace_explanation(
@@ -97,7 +105,7 @@ async def trace_explanation(
                Defaults to backend name if not provided.
     """
     lf = get_langfuse()
-    span_data: dict[str,object] = {}
+    span_data: dict[str, object] = {}
     model_label = model or backend
 
     if lf is None:
@@ -125,7 +133,7 @@ async def trace_explanation(
 
     except Exception as e:
         logger.warning("Langfuse trace failed — pipeline continues: %s", e)
-        
+
     finally:
         try:
             if lf:
