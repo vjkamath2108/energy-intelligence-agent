@@ -4,7 +4,7 @@
 **Date:** 2026-06-05  
 **Dataset:** stream1_log_anomaly/logs/sample.jsonl (98 anomaly events from 300 synthetic logs)  
 **Frontier model:** Claude Sonnet 4.5 (AWS Bedrock, us.* cross-region)  
-**Open-weight models:** Mistral 7B (Bedrock), llama3.2:3b (Ollama), phi4-mini (Ollama), qwen3:14b (Ollama)  
+**Open-weight models:** Mistral 7B (Bedrock), Mistral 7B (Sovereign/Ollama), llama3.2:3b (Ollama), phi4-mini (Ollama), qwen3:14b (Ollama)  
 **Anomaly detector:** Isolation Forest (contamination=auto)  
 
 ---
@@ -36,21 +36,21 @@ Three injected anomaly patterns:
 
 ## Results
 
-| Metric | Claude Sonnet (Bedrock) | Mistral 7B (Bedrock) | llama3.2:3b (Ollama) | phi4-mini (Ollama) | qwen3:14b (Ollama) |
-|---|---|---|---|---|---|
-| Total events | 98 | 49 | 49 | 49 | 49 |
-| Scoreable events (injected patterns) | 58 | 29 | 29 | 29 | 29 |
-| Isolated events (excl. from accuracy) | 40 | 20 | 20 | 20 | 20 |
-| JSON validity | 98/98 (100%) | 49/49 (100%) | 49/49 (100%) | 49/49 (100%) | 25/49 (51%) |
-| Severity accuracy (injected only) | 48/58 (82%) | 29/29 (100%) | 5/29 (17%) | 28/29 (96%) | 12/29 (41%) |
-| Pattern A accuracy (cascade) | 20/20 | 10/10 | 1/10 | 9/10 | 4/10 |
-| Pattern B accuracy (latency spike) | 12/14 | 7/7 | 1/7 | 7/7 | 5/7 |
-| Pattern C accuracy (error surge) | 16/24 | 12/12 | 3/12 | 12/12 | 3/12 |
-| Latency P50 (ms) | 5194 | 960 | 1239 | 1559 | 28512 |
-| Latency P95 (ms) | 6482 | 1214 | 1542 | 1769 | 53699 |
-| Data leaves network | Yes (AWS us.* cross-region) | Yes (AWS Bedrock) | No | No | No |
-| Cost per call | ~$0.003 | ~$0.0001 | ~$0 | ~$0 | ~$0 |
-| Production-ready | Yes | Yes | No | No | No |
+| Metric | Claude Sonnet (Bedrock) | Mistral 7B (Bedrock) | Mistral 7B (Sovereign/Ollama) | llama3.2:3b (Ollama) | phi4-mini (Ollama) | qwen3:14b (Ollama) |
+|---|---|---|---|---|---|---|
+| Total events | 98 | 49 | 49 | 147 | 98 | 98 |
+| Scoreable events (injected patterns) | 58 | 29 | 29 | 87 | 58 | 58 |
+| Isolated events (excl. from accuracy) | 40 | 20 | 20 | 60 | 40 | 40 |
+| JSON validity | 98/98 (100%) | 49/49 (100%) | 49/49 (100%) | 147/147 (100%) | 98/98 (100%) | 74/98 (75%) |
+| Severity accuracy (injected only) | 48/58 (82%) | 29/29 (100%) | 29/29 (100%) | 14/87 (16%) | 57/58 (98%) | 39/58 (67%) |
+| Pattern A accuracy (cascade) | 20/20 | 10/10 | 10/10 | 5/30 | 19/20 | 14/20 |
+| Pattern B accuracy (latency spike) | 12/14 | 7/7 | 7/7 | 5/21 | 14/14 | 12/14 |
+| Pattern C accuracy (error surge) | 16/24 | 12/12 | 12/12 | 4/36 | 24/24 | 13/24 |
+| Latency P50 (ms) | 5194 | 960 | 4198 | 1305 | 1560 | 31812 |
+| Latency P95 (ms) | 6482 | 1214 | 5054 | 4486 | 1861 | 87430 |
+| Data leaves network | Yes (AWS us.* cross-region) | Yes (AWS Bedrock) | No | No | No | No |
+| Cost per call | ~$0.003 | ~$0.0001 | ~$0 | ~$0 | ~$0 | ~$0 |
+| Production-ready | Yes | Yes | No | No | No | No |
 
 ---
 
@@ -62,9 +62,10 @@ Accuracy measured on injected pattern events only (Option B).
 
 - **Claude Sonnet (Bedrock)**: 48/58 (82%) overall.
 - **Mistral 7B (Bedrock)**: 29/29 (100%) overall.
-- **llama3.2:3b (Ollama)**: 5/29 (17%) overall.
-- **phi4-mini (Ollama)**: 28/29 (96%) overall.
-- **qwen3:14b (Ollama)**: 12/29 (41%) overall.
+- **Mistral 7B (Sovereign/Ollama)**: 29/29 (100%) overall.
+- **llama3.2:3b (Ollama)**: 14/87 (16%) overall.
+- **phi4-mini (Ollama)**: 57/58 (98%) overall.
+- **qwen3:14b (Ollama)**: 39/58 (67%) overall.
 
 ### 2. Mistral 7B — Managed vs Sovereign Deployment
 
@@ -83,25 +84,28 @@ without a latency spike. Only elevated 500 status codes as signal.
 
 - **Claude Sonnet (Bedrock)**: Pattern C accuracy 16/24.
 - **Mistral 7B (Bedrock)**: Pattern C accuracy 12/12.
-- **llama3.2:3b (Ollama)**: Pattern C accuracy 3/12.
-- **phi4-mini (Ollama)**: Pattern C accuracy 12/12.
-- **qwen3:14b (Ollama)**: Pattern C accuracy 3/12.
+- **Mistral 7B (Sovereign/Ollama)**: Pattern C accuracy 12/12.
+- **llama3.2:3b (Ollama)**: Pattern C accuracy 4/36.
+- **phi4-mini (Ollama)**: Pattern C accuracy 24/24.
+- **qwen3:14b (Ollama)**: Pattern C accuracy 13/24.
 
 ### 4. Latency vs Quality Trade-off
 
 - **Claude Sonnet (Bedrock)**: P50 5194ms, P95 6482ms, accuracy 48/58 (82%).
 - **Mistral 7B (Bedrock)**: P50 960ms, P95 1214ms, accuracy 29/29 (100%).
-- **llama3.2:3b (Ollama)**: P50 1239ms, P95 1542ms, accuracy 5/29 (17%).
-- **phi4-mini (Ollama)**: P50 1559ms, P95 1769ms, accuracy 28/29 (96%).
-- **qwen3:14b (Ollama)**: P50 28512ms, P95 53699ms, accuracy 12/29 (41%).
+- **Mistral 7B (Sovereign/Ollama)**: P50 4198ms, P95 5054ms, accuracy 29/29 (100%).
+- **llama3.2:3b (Ollama)**: P50 1305ms, P95 4486ms, accuracy 14/87 (16%).
+- **phi4-mini (Ollama)**: P50 1560ms, P95 1861ms, accuracy 57/58 (98%).
+- **qwen3:14b (Ollama)**: P50 31812ms, P95 87430ms, accuracy 39/58 (67%).
 
 ### 5. JSON Reliability
 
 - **Claude Sonnet (Bedrock)**: 98/98 (100%).
 - **Mistral 7B (Bedrock)**: 49/49 (100%).
-- **llama3.2:3b (Ollama)**: 49/49 (100%).
-- **phi4-mini (Ollama)**: 49/49 (100%).
-- **qwen3:14b (Ollama)**: 25/49 (51%).
+- **Mistral 7B (Sovereign/Ollama)**: 49/49 (100%).
+- **llama3.2:3b (Ollama)**: 147/147 (100%).
+- **phi4-mini (Ollama)**: 98/98 (100%).
+- **qwen3:14b (Ollama)**: 74/98 (75%).
 
 ---
 

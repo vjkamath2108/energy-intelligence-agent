@@ -27,11 +27,16 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Suppress Langfuse OTEL exporter noise when keys are not configured.
-# The SDK registers a background exporter at import time regardless of
-# whether it is initialised — this env var disables it cleanly before
-# the Langfuse import fires.
-if not os.getenv("LANGFUSE_PUBLIC_KEY") or not os.getenv("LANGFUSE_SECRET_KEY"):
+# Suppress Langfuse OTEL exporter noise when keys are missing or tracing is
+# disabled. The SDK registers a background exporter at import time regardless
+# of whether it is initialised — this env var disables it cleanly before the
+# Langfuse import fires.
+_tracing_disabled = (
+    not os.getenv("LANGFUSE_PUBLIC_KEY")
+    or not os.getenv("LANGFUSE_SECRET_KEY")
+    or os.getenv("LANGFUSE_ENABLED", "true").lower() == "false"
+)
+if _tracing_disabled:
     os.environ["OTEL_SDK_DISABLED"] = "true"
 
 from contextlib import asynccontextmanager  # noqa: E402
