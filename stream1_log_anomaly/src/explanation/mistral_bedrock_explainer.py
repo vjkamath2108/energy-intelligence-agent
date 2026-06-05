@@ -222,3 +222,43 @@ class MistralBedrockExplainer:
 
         append_explanation(anomalous_event, explanation, "mistral-bedrock", elapsed_ms)
         return explanation
+    
+    if __name__ == "__main__":
+    import asyncio
+    import json
+    from pathlib import Path
+    from stream1_log_anomaly.src.detection.anomaly_scorer import AnomalyScorer
+
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+
+    async def _smoke_test() -> None:
+        events = [
+            LogEvent(**json.loads(line))
+            for line in Path("stream1_log_anomaly/logs/sample.jsonl")
+            .read_text()
+            .splitlines()
+            if line.strip()
+        ]
+
+        scorer = AnomalyScorer()
+        explainer = MistralBedrockExplainer()
+
+        for i, event in enumerate(events):
+            result = scorer.score(event)
+            if result is None or not result.is_anomaly:
+                continue
+
+            context = events[max(0, i - 5) : i + 6]
+
+            print(f"\n{'='*60}")
+            print(f"ANOMALY at event [{i:03d}] — {event.service} {event.level}")
+            print(f"{'='*60}")
+
+            explanation = await explainer.explain(event, context)
+
+            print(f"Severity:  {explanation.severity}")
+            print(f"Summary:   {explanation.summary}")
+            print(f"Cause:     {explanation.likely_cause}")
+            print(f"Action:    {explanation.recommended_action}")
+
+    asyncio.run(_smoke_test())
