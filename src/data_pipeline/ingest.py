@@ -149,18 +149,21 @@ ON CONFLICT (doc_id) DO UPDATE
 
 
 async def _ensure_schema(conn: object) -> None:
-    """Create document_chunks table and indexes if they do not exist.
+    """Create pgvector extension and document_chunks table if they do not exist.
 
     Args:
         conn: An asyncpg connection with pgvector already registered.
     """
     import pathlib
-    schema_path = pathlib.Path(__file__).parent / "schema.sql"
-    ddl = schema_path.read_text()
-    # Execute non-empty statements only, skip comment-only lines
+    # pgvector extension must exist before CREATE TABLE uses vector(1536)
+    await conn.execute("CREATE EXTENSION IF NOT EXISTS vector;")  # type: ignore[attr-defined]
+    ddl = (pathlib.Path(__file__).parent / "schema.sql").read_text()
+    # Strip comment-only blocks, then execute each real statement
     for statement in ddl.split(";"):
-        stmt = statement.strip()
-        if stmt and not stmt.startswith("--"):
+        stmt = "\n".join(
+            line for line in statement.splitlines() if not line.strip().startswith("--")
+        ).strip()
+        if stmt:
             await conn.execute(stmt)  # type: ignore[attr-defined]
 
 

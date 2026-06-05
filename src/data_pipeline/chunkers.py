@@ -27,6 +27,10 @@ _SECTION_RE = re.compile(
 # Sentence boundary: end of sentence followed by whitespace and capital letter
 _SENTENCE_END_RE = re.compile(r"(?<=[.!?])\s+(?=[A-Z])")
 
+# Merge small segments until they reach this token count (~400 chars).
+# Prevents paragraph splitting from producing hundreds of sub-100-char chunks.
+_MIN_MERGE_TOKENS = 80
+
 
 class BaseChunker(ABC):
     """Abstract base for all chunking strategies.
@@ -231,9 +235,10 @@ class SemanticChunker(BaseChunker):
             List of semantically coherent RetrievedDocument chunks.
         """
         segments = self._split_semantic(content)
+        merged = self._merge_small(segments)
         chunks: list[RetrievedDocument] = []
 
-        for seg in segments:
+        for seg in merged:
             seg = seg.strip()
             if not seg:
                 continue
@@ -305,6 +310,43 @@ class SemanticChunker(BaseChunker):
             Non-empty paragraph strings.
         """
         return [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()]
+
+    def _merge_small(self, segments: list[str]) -> list[str]:
+        """Merge consecutive small segments until they reach _MIN_MERGE_TOKENS.
+
+        Prevents blank-line splitting from producing hundreds of sub-100-char
+        fragments. Stops merging into the current group when adding the next
+        segment would exceed max_chunk_size.
+
+        Args:
+            segments: Raw segments from _split_semantic.
+
+        Returns:
+            List of segments where each is at least _MIN_MERGE_TOKENS tokens,
+            unless it is the last (or only) segment in a boundary group.
+        """
+        merged: list[str] = []
+        current_parts: list[str] = []
+        current_tokens = 0
+
+        for seg in segments:
+            t = len(_tokens(seg))
+            if current_tokens + t > self.max_chunk_size and current_parts:
+                merged.append("\n\n".join(current_parts))
+                current_parts = [seg]
+                current_tokens = t
+            else:
+                current_parts.append(seg)
+                current_tokens += t
+                if current_tokens >= _MIN_MERGE_TOKENS:
+                    merged.append("\n\n".join(current_parts))
+                    current_parts = []
+                    current_tokens = 0
+
+        if current_parts:
+            merged.append("\n\n".join(current_parts))
+
+        return merged
 
     def _split_sentences(self, text: str) -> list[str]:
         """Split an oversized paragraph into sentence-level chunks.

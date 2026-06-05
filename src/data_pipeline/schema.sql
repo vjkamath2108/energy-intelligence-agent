@@ -1,6 +1,6 @@
 -- Document chunk store with pgvector embedding column.
 -- Run once after CREATE EXTENSION IF NOT EXISTS vector;
--- Embeddings (vector(1536)) are populated in W2.1 by the embedding pipeline.
+-- Embeddings (vector(1024)) are populated in W2.1 by the embedding pipeline.
 
 CREATE TABLE IF NOT EXISTS document_chunks (
     doc_id           TEXT    PRIMARY KEY,
@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS document_chunks (
     source           TEXT    NOT NULL,
     chunk_index      INTEGER NOT NULL,
     similarity_score FLOAT   DEFAULT 0.0,
-    embedding        vector(1536),          -- populated later in W2.1
+    embedding        vector(1024),          -- populated later in W2.1
     metadata         JSONB   DEFAULT '{}'
 );
 
@@ -23,3 +23,12 @@ CREATE INDEX IF NOT EXISTS idx_chunks_source_chunk
 -- CREATE INDEX idx_chunks_embedding
 --     ON document_chunks USING ivfflat (embedding vector_cosine_ops)
 --     WITH (lists = 100);
+
+-- BM25 full-text search (W2.2)
+-- Generated column keeps fts in sync with content automatically.
+ALTER TABLE document_chunks
+    ADD COLUMN IF NOT EXISTS fts tsvector
+    GENERATED ALWAYS AS (to_tsvector('english', content)) STORED;
+
+CREATE INDEX IF NOT EXISTS idx_chunks_fts
+    ON document_chunks USING gin(fts);
