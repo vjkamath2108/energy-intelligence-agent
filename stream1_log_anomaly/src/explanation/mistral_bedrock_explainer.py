@@ -222,8 +222,9 @@ class MistralBedrockExplainer:
 
         append_explanation(anomalous_event, explanation, "mistral-bedrock", elapsed_ms)
         return explanation
-    
-    if __name__ == "__main__":
+
+
+if __name__ == "__main__":
     import asyncio
     import json
     from pathlib import Path
