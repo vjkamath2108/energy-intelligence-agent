@@ -1,17 +1,19 @@
 #!/usr/bin/env bash
 # benchmark_ollama.sh — Run Ollama backends (Mistral local + other models)
-# Run on any machine with Ollama installed, after copying
-# benchmark_raw_bedrock.jsonl here from the Bedrock machine.
+# Runs independently — no dependency on benchmark_bedrock.sh.
 #
 # Prerequisites:
-#   - results/benchmark_raw_bedrock.jsonl present (copy from Bedrock machine)
 #   - Ollama running: ollama serve
 #   - Models pulled: ollama pull mistral && ollama pull llama3.2:3b && ollama pull phi4-mini
 #
 # Output: results/benchmark_raw_ollama.jsonl
 #         results/benchmark_report_ollama.md (partial — Ollama backends only)
 #
-# Then run benchmark_combine.sh for the final combined report.
+# Workflow:
+#   1. Run benchmark_bedrock.sh on the Bedrock machine (independently)
+#   2. Run this script on the Ollama machine (independently)
+#   3. Bring both raw files to one machine
+#   4. Run benchmark_combine.sh for the final report
 
 set -euo pipefail
 
@@ -19,41 +21,42 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$PROJECT_ROOT"
 
+# ============================================================
+# Configuration — change here only, not below
+# ============================================================
+OLLAMA_BASE_URL="${OLLAMA_BASE_URL:-http://localhost:11434}"
+OLLAMA_TIMEOUT_S="${OLLAMA_TIMEOUT_S:-120}"
 RESULTS_DIR="results"
 RAW_FILE="$RESULTS_DIR/benchmark_raw_ollama.jsonl"
-BEDROCK_RAW="$RESULTS_DIR/benchmark_raw_bedrock.jsonl"
+REPORT_FILE="$RESULTS_DIR/benchmark_report_ollama.md"
+REQUIRED_MODELS=("mistral" "llama3.2:3b" "phi4-mini")
+# ============================================================
+
+export OLLAMA_TIMEOUT_S
 
 echo "============================================================"
 echo " EIA Benchmark — Ollama Backends"
 echo " $(date '+%Y-%m-%d %H:%M:%S')"
+echo " OLLAMA_BASE_URL : $OLLAMA_BASE_URL"
+echo " OLLAMA_TIMEOUT_S: $OLLAMA_TIMEOUT_S"
 echo "============================================================"
-echo ""
-
-# Check Bedrock results are present
-if [[ ! -f "$BEDROCK_RAW" ]]; then
-    echo "ERROR: $BEDROCK_RAW not found."
-    echo "Copy it from the Bedrock machine first:"
-    echo "  scp <bedrock-machine>:~/path/to/EIA/results/benchmark_raw_bedrock.jsonl results/"
-    exit 1
-fi
-echo "Bedrock raw results found: $BEDROCK_RAW"
 echo ""
 
 # Check Ollama is running
 echo "Checking Ollama..."
-if ! curl -s http://localhost:11434/api/tags > /dev/null 2>&1; then
-    echo "ERROR: Ollama not running. Start it with: ollama serve"
+if ! curl -s "$OLLAMA_BASE_URL/api/tags" > /dev/null 2>&1; then
+    echo "ERROR: Ollama not running at $OLLAMA_BASE_URL"
+    echo "Start it with: ollama serve"
     exit 1
 fi
 echo "Ollama OK."
 echo ""
 
-# Check required models are pulled
+# Check required models are pulled — pull if missing
 echo "Checking models..."
-REQUIRED_MODELS=("mistral" "llama3.2:3b" "phi4-mini")
 for model in "${REQUIRED_MODELS[@]}"; do
     if ! ollama list 2>/dev/null | grep -q "^${model}"; then
-        echo "WARNING: Model '$model' not found. Pulling now..."
+        echo "  '$model' not found — pulling now..."
         ollama pull "$model"
     else
         echo "  $model OK"
@@ -62,6 +65,7 @@ done
 echo ""
 
 # Clear previous Ollama run
+mkdir -p "$RESULTS_DIR"
 > "$RAW_FILE"
 echo "Cleared $RAW_FILE"
 echo ""
@@ -72,7 +76,6 @@ echo " Running: Mistral 7B (Sovereign/Ollama)"
 echo " Note: ~3-4s per event, ~3min total"
 echo "------------------------------------------------------------"
 OLLAMA_MODEL=mistral:latest \
-OLLAMA_TIMEOUT_S=120 \
     python -m stream1_log_anomaly.benchmark_runner \
     --explainer mistral-local \
     --raw-output "$RAW_FILE"
@@ -100,19 +103,19 @@ echo ""
 
 # --- Partial report (Ollama backends only) ---
 echo "------------------------------------------------------------"
-echo " Generating partial report (Ollama backends)"
+echo " Generating partial report (Ollama backends only)"
 echo "------------------------------------------------------------"
 python -m stream1_log_anomaly.benchmark_runner \
     --report \
     --raw-input "$RAW_FILE" \
-    --report-output "$RESULTS_DIR/benchmark_report_ollama.md"
+    --report-output "$REPORT_FILE"
 
 echo ""
 echo "============================================================"
 echo " Ollama run complete."
 echo " Raw results:    $RAW_FILE"
-echo " Partial report: $RESULTS_DIR/benchmark_report_ollama.md"
+echo " Partial report: $REPORT_FILE"
 echo ""
-echo " Next step — generate final combined report:"
-echo "   scripts/benchmark_combine.sh"
+echo " Git add and push this file, then run benchmark_combine.sh"
+echo " once benchmark_raw_bedrock.jsonl is also present."
 echo "============================================================"
