@@ -16,11 +16,17 @@ Usage:
     # Run individual backends:
     python -m stream1_log_anomaly.benchmark_runner --explainer bedrock
     python -m stream1_log_anomaly.benchmark_runner --explainer mistral-bedrock
+    OLLAMA_MODEL=mistral:latest OLLAMA_TIMEOUT_S=120 \
+        python -m stream1_log_anomaly.benchmark_runner --explainer mistral-local
     OLLAMA_MODEL=llama3.2:3b python -m stream1_log_anomaly.benchmark_runner --explainer ollama
     OLLAMA_MODEL=phi4-mini python -m stream1_log_anomaly.benchmark_runner --explainer ollama
-    OLLAMA_MODEL=mistral:latest python -m stream1_log_anomaly.benchmark_runner --explainer mistral-local
-    OLLAMA_MODEL=qwen3:14b OLLAMA_TIMEOUT_S=120 OLLAMA_NUM_PREDICT=1024 \\
+    OLLAMA_MODEL=qwen3:14b OLLAMA_TIMEOUT_S=120 OLLAMA_NUM_PREDICT=1024 \
         python -m stream1_log_anomaly.benchmark_runner --explainer ollama
+
+    # Using shell scripts (split-machine workflow):
+    scripts/benchmark_office.sh   # office laptop — Bedrock backends
+    scripts/benchmark_local.sh    # local laptop  — Ollama backends
+    scripts/benchmark_combine.sh  # either machine — merge + final report
 
     # Generate report once all backends done:
     python -m stream1_log_anomaly.benchmark_runner --report
@@ -106,6 +112,41 @@ def _detect_anomalies(events: list[LogEvent]) -> list[tuple[int, LogEvent, list[
         len(anomalies), len(events),
     )
     return anomalies
+
+
+def _save_results(raw_path: Path, new_results: list[dict]) -> None:
+    """
+    Write results for a backend, replacing any existing results for
+    that backend. Other backends' results are preserved.
+
+    Prevents duplicate accumulation when a backend is re-run.
+    """
+    if not new_results:
+        return
+
+    backend_label = new_results[0]["backend"]
+    existing = []
+
+    if raw_path.exists():
+        for line in raw_path.read_text().splitlines():
+            if not line.strip():
+                continue
+            r = json.loads(line)
+            # Keep results from OTHER backends only
+            if r.get("backend") != backend_label:
+                existing.append(r)
+
+    raw_path.parent.mkdir(parents=True, exist_ok=True)
+    with raw_path.open("w") as f:
+        for r in existing + new_results:
+            f.write(json.dumps(r) + "\n")
+
+    logger.info(
+        "Saved %d results for backend '%s' to %s",
+        len(new_results),
+        backend_label,
+        raw_path,
+    )
 
 
 async def _run_backend(
@@ -265,9 +306,8 @@ def _compute_stats(results: list[dict]) -> dict:
     }
 
 
-def _load_results_by_backend() -> dict[str, list[dict]]:
+def _load_results_by_backend(raw_path: Path) -> dict[str, list[dict]]:
     """Load all results grouped by exact backend label."""
-    raw_path = RESULTS_DIR / "benchmark_raw.jsonl"
     if not raw_path.exists():
         return {}
     grouped: dict[str, list[dict]] = {}
@@ -315,10 +355,12 @@ def _production_ready(backend: str) -> str:
     return "No"
 
 
-def _write_markdown_report(all_results: dict[str, list[dict]]) -> Path:
+def _write_markdown_report(
+    all_results: dict[str, list[dict]],
+    report_path: Path,
+) -> Path:
     """Write benchmark report with one column per model."""
-    RESULTS_DIR.mkdir(exist_ok=True)
-    report_path = RESULTS_DIR / "bedrock_vs_ollama_vs_mistral.md"
+    report_path.parent.mkdir(parents=True, exist_ok=True)
     ts = datetime.now().strftime("%Y-%m-%d")
 
     # Ordered backends — known order first, extras appended
@@ -344,7 +386,7 @@ def _write_markdown_report(all_results: dict[str, list[dict]]) -> Path:
         return f"| {label} | " + " | ".join(vals) + " |"
 
     bedrock_stats = all_stats.get("bedrock", {})
-    non_bedrock = [b for b in backends if b not in ("bedrock",)]
+    non_bedrock = [b for b in backends if b != "bedrock"]
     local_models_str = ", ".join(_col_label(b) for b in non_bedrock)
 
     lines = [
@@ -526,23 +568,32 @@ def _write_markdown_report(all_results: dict[str, list[dict]]) -> Path:
     return report_path
 
 
-async def main(backend: str, report_only: bool) -> None:
+async def main(
+    backend: str,
+    report_only: bool,
+    raw_input: Path,
+    raw_output: Path,
+    report_output: Path,
+) -> None:
     RESULTS_DIR.mkdir(exist_ok=True)
-    raw_path = RESULTS_DIR / "benchmark_raw.jsonl"
 
     if report_only:
-        all_results = _load_results_by_backend()
+        all_results = _load_results_by_backend(raw_input)
         if not all_results:
-            print("No results in results/benchmark_raw.jsonl — run backends first.")
+            print(f"No results in {raw_input} — run backends first.")
             return
-        report_path = _write_markdown_report(all_results)
+        report_path = _write_markdown_report(all_results, report_output)
         print(f"\nReport written: {report_path}")
         all_stats = {b: _compute_stats(r) for b, r in all_results.items()}
         ordered = [b for b in DISPLAY_ORDER if b in all_stats]
         ordered += [b for b in sorted(all_stats) if b not in ordered]
         for b in ordered:
             s = all_stats[b]
-            print(f"  {_col_label(b)}: accuracy={s['severity_accuracy']}, P50={s['latency_p50_ms']}ms")
+            print(
+                f"  {_col_label(b)}: "
+                f"accuracy={s['severity_accuracy']}, "
+                f"P50={s['latency_p50_ms']}ms"
+            )
         return
 
     events = _load_events()
@@ -557,9 +608,7 @@ async def main(backend: str, report_only: bool) -> None:
     for b in run_backends:
         logger.info("--- %s run ---", b)
         backend_results = await _run_backend(b, anomalies)
-        with raw_path.open("a") as f:
-            for r in backend_results:
-                f.write(json.dumps(r) + "\n")
+        _save_results(raw_output, backend_results)
         stats = _compute_stats(backend_results)
         print(
             f"\n{_col_label(b)} complete — "
@@ -567,9 +616,9 @@ async def main(backend: str, report_only: bool) -> None:
             f"P50: {stats['latency_p50_ms']}ms"
         )
 
-    all_results = _load_results_by_backend()
+    all_results = _load_results_by_backend(raw_output)
     if len(all_results) > 1:
-        report_path = _write_markdown_report(all_results)
+        report_path = _write_markdown_report(all_results, report_output)
         print(f"\nReport written: {report_path}")
 
 
@@ -587,6 +636,11 @@ Examples:
   OLLAMA_MODEL=llama3.2:3b \\
       python -m stream1_log_anomaly.benchmark_runner --explainer ollama
   python -m stream1_log_anomaly.benchmark_runner --report
+
+  # Split-machine workflow:
+  scripts/benchmark_office.sh    # office laptop
+  scripts/benchmark_local.sh     # local laptop
+  scripts/benchmark_combine.sh   # merge + final report
         """,
     )
     parser.add_argument(
@@ -598,7 +652,32 @@ Examples:
     parser.add_argument(
         "--report",
         action="store_true",
-        help="Generate report from existing results/benchmark_raw.jsonl",
+        help="Generate report from existing raw results without running inference",
+    )
+    parser.add_argument(
+        "--raw-output",
+        type=Path,
+        default=RESULTS_DIR / "benchmark_raw.jsonl",
+        help="Path to write raw results JSONL (default: results/benchmark_raw.jsonl)",
+    )
+    parser.add_argument(
+        "--raw-input",
+        type=Path,
+        default=RESULTS_DIR / "benchmark_raw.jsonl",
+        help="Path to read raw results JSONL for --report (default: results/benchmark_raw.jsonl)",
+    )
+    parser.add_argument(
+        "--report-output",
+        type=Path,
+        default=RESULTS_DIR / "bedrock_vs_ollama_vs_mistral.md",
+        help="Path to write the markdown report (default: results/bedrock_vs_ollama_vs_mistral.md)",
     )
     args = parser.parse_args()
-    asyncio.run(main(args.explainer, report_only=args.report))
+
+    asyncio.run(main(
+        backend=args.explainer,
+        report_only=args.report,
+        raw_input=args.raw_input,
+        raw_output=args.raw_output,
+        report_output=args.report_output,
+    ))
