@@ -247,6 +247,13 @@ venv/
 
 .env
 
+# Benchmark results — merged/generated files (per-machine source files are tracked)
+# benchmark_raw_bedrock.jsonl and benchmark_raw_ollama.jsonl ARE tracked.
+# The files below are generated locally by benchmark_combine.sh — do not commit them.
+results/benchmark_raw.jsonl
+results/bedrock_vs_ollama_vs_mistral.md
+results/anomaly_log.jsonl
+
 # Terraform
 **/.terraform/
 **/.terraform.lock.hcl
