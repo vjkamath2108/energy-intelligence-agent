@@ -42,12 +42,12 @@ Three injected anomaly patterns:
 | Scoreable events (injected patterns) | 29 | 29 | 29 |
 | Isolated events (excl. from accuracy) | 20 | 20 | 20 |
 | JSON validity | 49/49 (100%) | 49/49 (100%) | 49/49 (100%) |
-| Severity accuracy (injected only) | 29/29 (100%) | 4/29 (13%) | 29/29 (100%) |
-| Pattern A accuracy (cascade) | 10/10 | 2/10 | 10/10 |
-| Pattern B accuracy (latency spike) | 7/7 | 0/7 | 7/7 |
-| Pattern C accuracy (error surge) | 12/12 | 2/12 | 12/12 |
-| Latency P50 (ms) | 3196 | 1331 | 1986 |
-| Latency P95 (ms) | 3550 | 1668 | 2399 |
+| Severity accuracy (injected only) | 29/29 (100%) | 2/29 (6%) | 28/29 (96%) |
+| Pattern A accuracy (cascade) | 10/10 | 0/10 | 9/10 |
+| Pattern B accuracy (latency spike) | 7/7 | 1/7 | 7/7 |
+| Pattern C accuracy (error surge) | 12/12 | 1/12 | 12/12 |
+| Latency P50 (ms) | 3167 | 1297 | 1992 |
+| Latency P95 (ms) | 3566 | 1594 | 2330 |
 | Data leaves network | No | No | No |
 | Cost per call | ~$0 | ~$0 | ~$0 |
 | Production-ready | No | No | No |
@@ -61,8 +61,8 @@ Three injected anomaly patterns:
 Accuracy measured on injected pattern events only (Option B).
 
 - **Mistral 7B (Sovereign/Ollama)**: 29/29 (100%) overall.
-- **llama3.2:3b (Ollama)**: 4/29 (13%) overall.
-- **phi4-mini (Ollama)**: 29/29 (100%) overall.
+- **llama3.2:3b (Ollama)**: 2/29 (6%) overall.
+- **phi4-mini (Ollama)**: 28/29 (96%) overall.
 
 ### 2. Mistral 7B — Managed vs Sovereign Deployment
 
@@ -80,14 +80,14 @@ Pattern C tests severity identification from error signal alone,
 without a latency spike. Only elevated 500 status codes as signal.
 
 - **Mistral 7B (Sovereign/Ollama)**: Pattern C accuracy 12/12.
-- **llama3.2:3b (Ollama)**: Pattern C accuracy 2/12.
+- **llama3.2:3b (Ollama)**: Pattern C accuracy 1/12.
 - **phi4-mini (Ollama)**: Pattern C accuracy 12/12.
 
 ### 4. Latency vs Quality Trade-off
 
-- **Mistral 7B (Sovereign/Ollama)**: P50 3196ms, P95 3550ms, accuracy 29/29 (100%).
-- **llama3.2:3b (Ollama)**: P50 1331ms, P95 1668ms, accuracy 4/29 (13%).
-- **phi4-mini (Ollama)**: P50 1986ms, P95 2399ms, accuracy 29/29 (100%).
+- **Mistral 7B (Sovereign/Ollama)**: P50 3167ms, P95 3566ms, accuracy 29/29 (100%).
+- **llama3.2:3b (Ollama)**: P50 1297ms, P95 1594ms, accuracy 2/29 (6%).
+- **phi4-mini (Ollama)**: P50 1992ms, P95 2330ms, accuracy 28/29 (96%).
 
 ### 5. JSON Reliability
 
