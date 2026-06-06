@@ -25,8 +25,8 @@ echo ""
 
 # Verify AWS access before starting
 echo "Checking AWS access..."
-if ! aws sts get-caller-identity --profile containers > /dev/null 2>&1; then
-    echo "ERROR: AWS access failed. Check AWS_PROFILE=containers and credentials."
+if ! aws sts get-caller-identity --profile bedrock > /dev/null 2>&1; then
+    echo "ERROR: AWS access failed. Check AWS_PROFILE=bedrock and credentials."
     exit 1
 fi
 echo "AWS access OK."
@@ -42,7 +42,7 @@ echo ""
 echo "------------------------------------------------------------"
 echo " Running: Claude Sonnet (Bedrock)"
 echo "------------------------------------------------------------"
-AWS_PROFILE=containers \
+AWS_PROFILE=bedrock \
 AWS_REGION=eu-west-2 \
     python -m stream1_log_anomaly.benchmark_runner \
     --explainer bedrock \
@@ -53,7 +53,7 @@ echo ""
 echo "------------------------------------------------------------"
 echo " Running: Mistral 7B (Bedrock)"
 echo "------------------------------------------------------------"
-AWS_PROFILE=containers \
+AWS_PROFILE=bedrock \
 BEDROCK_REGION=eu-west-2 \
     python -m stream1_log_anomaly.benchmark_runner \
     --explainer mistral-bedrock \
