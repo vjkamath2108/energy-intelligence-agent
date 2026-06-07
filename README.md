@@ -123,32 +123,34 @@ The centrepiece alone leaves four questions unanswered. The streams answer them.
 ### Inference Backend
 
 ```
-                    ┌─────────────────────┐
-                    │   Application code  │
-                    │   (unchanged)       │
-                    └──────────┬──────────┘
-                               │
-              ┌────────────────┼────────────────┐
-              ▼                ▼                 ▼
-      --explainer        --explainer       Production
-        bedrock            ollama           sovereign
-              │                │                 │
-     AWS Bedrock          localhost         vLLM on EKS
-     Claude Sonnet        Ollama            inside client
-     (default)            (dev)             VPC
-              │                │                 │
-              └────────────────┴─────────────────┘
-                               │
-                    ┌──────────▼──────────┐
-                    │  Pydantic schema    │
-                    │  (identical output) │
-                    └─────────────────────┘
+                         ┌─────────────────────┐
+                         │   Application code  │
+                         │   (unchanged)       │
+                         └──────────┬──────────┘
+                                    │
+          ┌─────────────────────────┼──────────────────────────┐
+          ▼                         ▼                          ▼
+  FRONTIER MANAGED          OPEN-WEIGHT MANAGED         SOVEREIGN
+  --explainer bedrock        --explainer                --explainer
+                              mistral-bedrock            mistral-local
+          │                         │                          │
+  AWS Bedrock                AWS Bedrock                  Ollama /
+  Claude Sonnet              Mistral 7B                   vLLM on EKS
+  ~$0.003/call               ~$0.0001/call                ~$0/call
+  Data → AWS                 Data → AWS                   Zero egress
+          │                         │                          │
+          └─────────────────────────┴──────────────────────────┘
+                                    │
+                         ┌──────────▼──────────┐
+                         │  Pydantic schema    │
+                         │  (identical output) │
+                         └─────────────────────┘
 ```
 
-Cost crossover: EKS self-hosting becomes cheaper than Bedrock at a volume
-that depends on your model choice, node utilisation, and engineering overhead.
-See [results/bedrock_vs_ollama.md](results/bedrock_vs_ollama.md) for the
-decision framework and how to calculate the crossover for your specific context.
+Swappable by a single CLI flag. Same Pydantic output schema regardless of
+backend — application code is unchanged. See
+[results/bedrock_vs_ollama_vs_mistral.md](results/bedrock_vs_ollama_vs_mistral.md)
+for the full benchmark and deployment decision framework.
 
 ---
 
@@ -204,8 +206,9 @@ pip install -r stream1_log_anomaly/requirements.txt
 
 cp .env.example .env   # add AWS credentials
 
-python -m stream1_log_anomaly.main
-python -m stream1_log_anomaly.main --explainer ollama   # sovereign mode
+python -m stream1_log_anomaly.main                             # Claude Sonnet (Bedrock)
+python -m stream1_log_anomaly.main --explainer mistral-bedrock # Mistral 7B (Bedrock, 30x cheaper)
+python -m stream1_log_anomaly.main --explainer mistral-local   # Mistral 7B (sovereign, zero egress)
 ```
 
 Example output:
@@ -229,6 +232,55 @@ Action:    Check auth-service health endpoints and connection pool metrics.
 # Prerequisites: RDS PostgreSQL 15 + pgvector, .env configured
 python -m src.agent.energy_agent --query "Optimal dispatch for peak demand"
 ```
+
+---
+
+## Benchmarking Strategy
+
+The system is designed to run across three deployment tiers. Every model runs
+against the same anomaly events, same prompt template, and same ±5 context
+window — making the comparison apples-to-apples.
+
+### Three Tiers
+
+**Tier 1 — Frontier managed (Claude Sonnet via Bedrock)**
+Quality and reliability baseline. Best choice when output quality is
+non-negotiable and the client has signed a DPA with Anthropic.
+
+**Tier 2 — Open-weight managed (Mistral 7B via Bedrock)**
+Same managed infrastructure as Tier 1 but ~30× cheaper per call. Accuracy
+matched the frontier model on every injected anomaly pattern in benchmarking.
+Best choice when volume makes Claude cost-prohibitive and the client is
+comfortable with open-weight quality trade-offs.
+
+**Tier 3 — Open-weight sovereign (Mistral 7B or phi4-mini via Ollama / vLLM)**
+Zero data egress — satisfies NIS2 data residency requirements for UK energy
+operators. No external API dependency. The latency trade-off is acceptable for
+async anomaly pipelines; GPU hardware (g5.xlarge on EKS/vLLM) closes the gap
+for real-time dashboards.
+
+### Benchmark Results (Stream 1 — Log Anomaly Explanation)
+
+Accuracy is measured only on injected pattern events with deterministic ground
+truth. Isolated events are included in latency and JSON validity only.
+
+| Model | Deployment | Severity Accuracy | Latency P50 | Cost/call | Data Egress |
+|---|---|---|---|---|---|
+| Claude Sonnet 4.5 | Bedrock (managed) | 82% | 4673ms | ~$0.003 | Yes (AWS) |
+| Mistral 7B | Bedrock (managed) | **100%** | 1316ms | ~$0.0001 | Yes (AWS) |
+| Mistral 7B | Ollama (sovereign) | **100%** | 3167ms | ~$0 | **None** |
+| phi4-mini | Ollama (sovereign) | 96% | 1992ms | ~$0 | **None** |
+| llama3.2:3b | Ollama (sovereign) | 6% | 1297ms | ~$0 | **None** |
+
+Key findings:
+- Mistral 7B (Bedrock) matches or exceeds frontier accuracy at 30× lower cost.
+- Mistral 7B (Sovereign) delivers identical accuracy with zero data egress —
+  the only production-ready NIS2-compliant option on current hardware.
+- phi4-mini is the best-value sovereign fallback if Mistral is unavailable.
+- llama3.2:3b is unsuitable for structured severity classification at 3B scale.
+
+Full methodology, pattern-level breakdown, and deployment decision framework:
+[results/bedrock_vs_ollama_vs_mistral.md](results/bedrock_vs_ollama_vs_mistral.md)
 
 ---
 
@@ -279,7 +331,7 @@ complexity: generating DPO preference pairs in Stream 4.
 | [VECTOR_DB_ANALYSIS.md](docs/VECTOR_DB_ANALYSIS.md) | pgvector vs alternatives |
 | [CHUNKING_STRATEGY.md](docs/CHUNKING_STRATEGY.md) | Chunking approach |
 | [SOVEREIGN_INFERENCE.md](docs/SOVEREIGN_INFERENCE.md) | Data sovereignty decision framework |
-| [results/bedrock_vs_ollama.md](results/bedrock_vs_ollama.md) | Four-model inference benchmark (Bedrock, llama3.2:3b, phi4-mini, qwen3:14b) |
+| [results/bedrock_vs_ollama_vs_mistral.md](results/bedrock_vs_ollama_vs_mistral.md) | Five-model inference benchmark across frontier, open-weight managed, and sovereign deployment tiers |
 
 ---
 
