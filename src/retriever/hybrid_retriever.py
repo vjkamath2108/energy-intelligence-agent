@@ -45,7 +45,7 @@ import time
 from dataclasses import dataclass, field
 
 from src.retriever.bm25 import BM25Retriever
-from src.embeddings import TitanEmbedder, search_similar
+from src.retriever.embeddings import TitanEmbedder, search_similar
 from src.models import RetrievedDocument
 
 logger = logging.getLogger(__name__)
