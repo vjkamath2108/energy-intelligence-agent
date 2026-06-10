@@ -167,7 +167,7 @@ async def _ensure_schema(conn: object) -> None:
             await conn.execute(stmt)  # type: ignore[attr-defined]
 
 
-async def store_chunks(chunks: list[RetrievedDocument]) -> None:
+async def store_chunks(chunks: list[RetrievedDocument], truncate: bool = False) -> None:
     """Insert or upsert chunks into the document_chunks table.
 
     Uses executemany for batched inserts. Runs the schema DDL first
@@ -175,10 +175,16 @@ async def store_chunks(chunks: list[RetrievedDocument]) -> None:
 
     Args:
         chunks: List of RetrievedDocument instances to persist.
+        truncate: When True, TRUNCATE document_chunks before inserting.
+                  Use this for a clean re-ingest after synthetic doc changes.
     """
     logger.info("Storing %d chunks into document_chunks …", len(chunks))
     async with get_connection() as conn:
         await _ensure_schema(conn)
+
+        if truncate:
+            await conn.execute("TRUNCATE document_chunks")
+            logger.info("Truncated document_chunks — clean slate for re-ingest.")
 
         rows = [
             (
@@ -201,11 +207,13 @@ async def store_chunks(chunks: list[RetrievedDocument]) -> None:
 # ---------------------------------------------------------------------------
 
 
-async def run_pipeline(dry_run: bool = False) -> None:
+async def run_pipeline(dry_run: bool = False, truncate: bool = False) -> None:
     """Full ingestion pipeline: generate → compare → store.
 
     Args:
         dry_run: When True, skip the database write step.
+        truncate: When True, TRUNCATE document_chunks before inserting.
+                  Required for clean re-ingest after synthetic doc changes.
     """
     # 1. Generate documents
     logger.info("Generating synthetic documents …")
@@ -245,7 +253,7 @@ async def run_pipeline(dry_run: bool = False) -> None:
         logger.info("--dry-run: skipping database write.")
         return
 
-    await store_chunks(semantic_chunks)
+    await store_chunks(semantic_chunks, truncate=truncate)
     await close_pool()
 
 
@@ -256,5 +264,10 @@ if __name__ == "__main__":
         action="store_true",
         help="Print comparison table without writing to the database.",
     )
+    parser.add_argument(
+        "--truncate",
+        action="store_true",
+        help="TRUNCATE document_chunks before inserting. Use for clean re-ingest.",
+    )
     args = parser.parse_args()
-    asyncio.run(run_pipeline(dry_run=args.dry_run))
+    asyncio.run(run_pipeline(dry_run=args.dry_run, truncate=args.truncate))
