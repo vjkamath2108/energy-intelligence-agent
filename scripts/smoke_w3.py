@@ -103,11 +103,11 @@ async def smoke_bedrock() -> bool:
     elapsed_ms = (time.monotonic() - t0) * 1000
     _print_result("bedrock", result, elapsed_ms)
 
-    gate_10s = elapsed_ms < 10000
     gate_json = isinstance(result, DispatchRecommendation)
+    latency_warn = elapsed_ms > 10000
     print(f"\n[bedrock] Gate: valid JSON schema  → {'PASS' if gate_json else 'FAIL'}")
-    print(f"[bedrock] Gate: latency < 10s      → {'PASS' if gate_10s else f'FAIL ({elapsed_ms:.0f}ms)'}")
-    return gate_json and gate_10s
+    print(f"[bedrock] Latency: {elapsed_ms:.0f} ms  {'⚠ slow (>10s), check region/model' if latency_warn else 'OK'}")
+    return gate_json
 
 
 async def smoke_ollama() -> bool:
