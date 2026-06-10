@@ -36,21 +36,20 @@ _PROBE_QUERIES = [
 
 async def check_db() -> bool:
     print("\n── 1. DB coverage ─────────────────────────────────────────")
-    conn = await get_connection()
+    async with get_connection() as conn:
+        total   = await conn.fetchval("SELECT COUNT(*) FROM document_chunks")
+        no_fts  = await conn.fetchval("SELECT COUNT(*) FROM document_chunks WHERE fts IS NULL")
+        no_emb  = await conn.fetchval("SELECT COUNT(*) FROM document_chunks WHERE embedding IS NULL")
 
-    total   = await conn.fetchval("SELECT COUNT(*) FROM document_chunks")
-    no_fts  = await conn.fetchval("SELECT COUNT(*) FROM document_chunks WHERE fts IS NULL")
-    no_emb  = await conn.fetchval("SELECT COUNT(*) FROM document_chunks WHERE embedding IS NULL")
+        print(f"  Total chunks   : {total}")
+        print(f"  Missing fts    : {no_fts}  {'⚠ BM25 will return 0' if no_fts else '✓'}")
+        print(f"  Missing embed  : {no_emb}  {'⚠ semantic will return 0' if no_emb else '✓'}")
 
-    print(f"  Total chunks   : {total}")
-    print(f"  Missing fts    : {no_fts}  {'⚠ BM25 will return 0' if no_fts else '✓'}")
-    print(f"  Missing embed  : {no_emb}  {'⚠ semantic will return 0' if no_emb else '✓'}")
-
-    print("\n── 2. Source inventory (first 25) ─────────────────────────")
-    rows = await conn.fetch(
-        "SELECT source, COUNT(*) as chunks FROM document_chunks "
-        "GROUP BY source ORDER BY source LIMIT 25"
-    )
+        print("\n── 2. Source inventory (first 25) ─────────────────────────")
+        rows = await conn.fetch(
+            "SELECT source, COUNT(*) as chunks FROM document_chunks "
+            "GROUP BY source ORDER BY source LIMIT 25"
+        )
     if rows:
         for r in rows:
             print(f"  {r['chunks']:>3} chunks  {r['source']}")
@@ -79,8 +78,8 @@ async def fix_fts() -> None:
     print("\n── Applying BM25 schema (fts column + GIN index)… ─────────")
     bm25 = BM25Retriever()
     await bm25.apply_schema()
-    conn = await get_connection()
-    no_fts = await conn.fetchval("SELECT COUNT(*) FROM document_chunks WHERE fts IS NULL")
+    async with get_connection() as conn:
+        no_fts = await conn.fetchval("SELECT COUNT(*) FROM document_chunks WHERE fts IS NULL")
     print(f"  Missing fts after apply_schema: {no_fts}")
 
 
