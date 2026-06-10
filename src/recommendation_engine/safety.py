@@ -143,10 +143,13 @@ async def check_grounding(
             flagged_reasons=("no retrieved documents to ground against",),
         )
 
-    claim_text = f"{action} {reasoning}"
     corpus = " ".join(d.content for d in context_docs)
 
-    overlap = term_overlap(claim_text, corpus)
+    # Term overlap checks the action only — the action is the atomic claim that
+    # must be grounded. Reasoning is a verbose narrative explanation and
+    # naturally uses vocabulary beyond what appears in the source docs, which
+    # would dilute the ratio and produce false positives.
+    overlap = term_overlap(action, corpus)
     reasons: list[str] = []
 
     if overlap < TERM_OVERLAP_THRESHOLD:
@@ -156,7 +159,10 @@ async def check_grounding(
 
     sem_sim: float | None = None
     if embedder is not None:
-        claim_vec = await embedder.embed(claim_text[:2000])
+        # Use action + reasoning for semantic similarity — the full output gives
+        # the embedder more signal than the action alone.
+        sem_text = f"{action} {reasoning}"
+        claim_vec = await embedder.embed(sem_text[:2000])
         corpus_vec = await embedder.embed(corpus[:2000])
         sem_sim = _cosine(claim_vec, corpus_vec)
         if sem_sim < SEMANTIC_THRESHOLD:
