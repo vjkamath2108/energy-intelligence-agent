@@ -67,3 +67,63 @@ async def test_dispatch_happy_path_returns_recommendation_and_audits() -> None:
         "Should we dispatch unit 3?", [mock_doc]
     )
     mock_audit.record.assert_awaited_once()
+
+
+async def test_dispatch_retrieval_failure_returns_fallback_and_audits() -> None:
+    """Retrieval exception → fallback DispatchRecommendation, audit still recorded."""
+    mock_retriever = MagicMock()
+    mock_retriever.search = AsyncMock(side_effect=RuntimeError("DB unreachable"))
+
+    mock_audit = MagicMock()
+    mock_audit.record = AsyncMock()
+
+    with patch("src.agent.energy_agent.ClaudeRecommender"):
+        agent = EnergyIntelligenceAgent(
+            backend="bedrock",
+            retriever=mock_retriever,
+            audit_logger=mock_audit,
+        )
+        result = await agent.dispatch("Should we dispatch unit 3?")
+
+    assert result.requires_human_review is True
+    assert result.confidence == 0.0
+    assert result.query == "Should we dispatch unit 3?"
+    assert "FALLBACK" in result.action
+    assert "RuntimeError" in result.reasoning
+    mock_audit.record.assert_awaited_once()
+
+
+async def test_dispatch_recommender_failure_returns_fallback_and_audits() -> None:
+    """Recommender exception → fallback DispatchRecommendation, audit still recorded."""
+    mock_doc = RetrievedDocument(
+        doc_id="doc-1",
+        content="Grid frequency constraint",
+        source="regulation/nget-p28.pdf",
+        chunk_index=0,
+        similarity_score=0.9,
+    )
+    mock_retriever = MagicMock()
+    mock_retriever.search = AsyncMock(return_value=[mock_doc])
+
+    mock_audit = MagicMock()
+    mock_audit.record = AsyncMock()
+
+    with patch("src.agent.energy_agent.ClaudeRecommender") as mock_recommender_cls:
+        mock_recommender = MagicMock()
+        mock_recommender.recommend = AsyncMock(
+            side_effect=RuntimeError("Bedrock throttled beyond retries")
+        )
+        mock_recommender_cls.return_value = mock_recommender
+
+        agent = EnergyIntelligenceAgent(
+            backend="bedrock",
+            retriever=mock_retriever,
+            audit_logger=mock_audit,
+        )
+        result = await agent.dispatch("Should we dispatch unit 3?")
+
+    assert result.requires_human_review is True
+    assert result.confidence == 0.0
+    assert "FALLBACK" in result.action
+    assert "RuntimeError" in result.reasoning
+    mock_audit.record.assert_awaited_once()
