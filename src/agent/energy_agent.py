@@ -65,6 +65,14 @@ class EnergyIntelligenceAgent:
                 hallucination_flagged=False,
             )
 
-        entry = entry_from_recommendation(rec)
-        await self.audit_logger.record(entry)
+        try:
+            entry = entry_from_recommendation(rec)
+            await self.audit_logger.record(entry)
+        except Exception as audit_exc:
+            logger.error(
+                "Audit write failed — recommendation not recorded: %s: %s",
+                type(audit_exc).__name__,
+                audit_exc,
+            )
+
         return rec

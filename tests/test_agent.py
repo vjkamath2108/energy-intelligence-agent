@@ -4,8 +4,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from src.agent.energy_agent import EnergyIntelligenceAgent
 from src.models import DispatchRecommendation, RetrievedDocument
-from src.recommendation_engine.claude_client import ClaudeRecommender
-from src.recommendation_engine.ollama_client import OllamaRecommender
 
 
 def test_bedrock_backend_creates_claude_recommender() -> None:
