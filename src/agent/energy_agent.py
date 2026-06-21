@@ -46,4 +46,25 @@ class EnergyIntelligenceAgent:
         Returns:
             DispatchRecommendation — grounded or fallback with requires_human_review=True.
         """
-        raise NotImplementedError
+        try:
+            docs = await self.retriever.search(query)
+            rec = await self._recommender.recommend(query, docs)
+        except Exception as e:
+            logger.error(
+                "Pipeline failure — returning fallback recommendation: %s: %s",
+                type(e).__name__,
+                e,
+            )
+            rec = DispatchRecommendation(
+                query=query,
+                action="FALLBACK: system unavailable — manual review required",
+                confidence=0.0,
+                supporting_documents=[],
+                reasoning=f"{type(e).__name__}: {e}",
+                requires_human_review=True,
+                hallucination_flagged=False,
+            )
+
+        entry = entry_from_recommendation(rec)
+        await self.audit_logger.record(entry)
+        return rec
