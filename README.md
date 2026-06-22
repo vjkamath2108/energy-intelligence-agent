@@ -332,6 +332,7 @@ complexity: generating DPO preference pairs in Stream 4.
 | [CHUNKING_STRATEGY.md](docs/CHUNKING_STRATEGY.md) | Chunking approach |
 | [SOVEREIGN_INFERENCE.md](docs/SOVEREIGN_INFERENCE.md) | Data sovereignty decision framework |
 | [results/bedrock_vs_ollama_vs_mistral.md](results/bedrock_vs_ollama_vs_mistral.md) | Five-model inference benchmark across frontier, open-weight managed, and sovereign deployment tiers |
+| [results/model_comparison_report.md](results/model_comparison_report.md) | **Model comparison report** — six models, two pipelines, quantisation trade-offs, deployment recommendations, honest write-up of what went wrong |
 
 ---
 
