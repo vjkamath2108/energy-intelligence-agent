@@ -24,12 +24,16 @@ import httpx
 
 from src.models import DispatchRecommendation, RetrievedDocument
 from src.recommendation_engine._parsing import ParsedLLMOutput, parse_llm_output
+from src.recommendation_engine.confidence import (
+    ConfidenceScorer,
+    ConfidenceSignals,
+)
 from src.recommendation_engine.prompts import build_user_message, load_system_prompt
 from src.recommendation_engine.safety import (
-    HUMAN_REVIEW_THRESHOLD,
     SafetyResult,
     check_grounding,
 )
+from src.safety.constraint_validator import ValidationResult, check_constraints
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +65,7 @@ class OllamaRecommender:
     base_url: str = field(default_factory=lambda: _OLLAMA_BASE_URL)
     model: str = field(default_factory=lambda: _OLLAMA_MODEL)
     prompt_version: str = "v1"
+    scorer: ConfidenceScorer = field(default_factory=ConfidenceScorer)
 
     def __post_init__(self) -> None:
         self._client = httpx.AsyncClient(base_url=self.base_url, timeout=_OLLAMA_TIMEOUT_S)
@@ -171,14 +176,31 @@ class OllamaRecommender:
             parsed["action"], parsed["reasoning"], context_docs, embedder=None
         )
 
-        confidence = parsed["confidence"]
+        signals = ConfidenceSignals(
+            llm_confidence=parsed["confidence"],
+            safety_result=safety,
+            supporting_documents=parsed["supporting_documents"],
+        )
+        confidence, requires_review = self.scorer.score(signals)
+
+        constraint_result: ValidationResult = check_constraints(
+            parsed["action"], context_docs
+        )
+        if not constraint_result.passed:
+            logger.warning(
+                "Regulatory constraint violations detected — flagging for human review: %s",
+                [v.reason for v in constraint_result.violations],
+            )
+
         return DispatchRecommendation(
             query=query,
             action=parsed["action"],
             confidence=confidence,
             supporting_documents=parsed["supporting_documents"],
             reasoning=parsed["reasoning"],
-            requires_human_review=confidence < HUMAN_REVIEW_THRESHOLD or not safety.is_grounded,
+            requires_human_review=(
+                requires_review or not safety.is_grounded or not constraint_result.passed
+            ),
             hallucination_flagged=not safety.is_grounded,
         )
 

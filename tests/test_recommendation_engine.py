@@ -98,7 +98,7 @@ async def test_claude_client_returns_dispatch_recommendation() -> None:
 
     assert isinstance(result, DispatchRecommendation)
     assert result.action == "Issue upward dispatch instruction to DRAX1G for 200 MW"
-    assert result.confidence == pytest.approx(0.85)
+    assert result.confidence == pytest.approx(0.83)
     assert result.query == "North constraint"
     assert result.requires_human_review is False
     assert result.hallucination_flagged is False
@@ -283,7 +283,7 @@ async def test_ollama_client_returns_dispatch_recommendation() -> None:
 
     assert isinstance(result, DispatchRecommendation)
     assert result.action == "Issue upward dispatch instruction to DRAX1G for 200 MW"
-    assert result.confidence == pytest.approx(0.85)
+    assert result.confidence == pytest.approx(0.83)
     assert result.requires_human_review is False
     assert result.hallucination_flagged is False
 
