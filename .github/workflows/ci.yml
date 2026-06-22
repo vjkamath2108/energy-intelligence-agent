@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    name: Lint (ruff + mypy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install lint tools
+        run: pip install ruff mypy pydantic langfuse boto3 httpx pyyaml scikit-learn numpy
+
+      - name: ruff check
+        run: ruff check src/ evaluation/
+
+      - name: ruff format check
+        run: ruff format --check src/ evaluation/
+
+      - name: mypy --strict
+        run: mypy --strict src/
+
+  test:
+    name: Unit tests + coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt pytest-cov
+
+      - name: Run tests with coverage
+        run: |
+          PYTHONPATH=. pytest tests/ \
+            --ignore=tests/test_embeddings.py \
+            --ignore=tests/test_hybrid_retriever.py \
+            --ignore=tests/test_db.py \
+            --ignore=tests/test_bm25.py \
+            --cov --cov-fail-under=80 \
+            -q --tb=short
+
+  eval-gate:
+    name: Faithfulness & citation gate
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run eval gate (prompt v1, mock)
+        run: PYTHONPATH=. python evaluation/ci_gate.py --mock --prompt-version v1
+
+  docker:
+    name: Docker build
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: energy-agent:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
