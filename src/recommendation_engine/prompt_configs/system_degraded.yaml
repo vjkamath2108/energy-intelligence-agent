@@ -1,0 +1,13 @@
+version: "degraded"
+description: "Deliberately degraded prompt — omits grounding and citation requirements. Used by evaluation/ci_gate.py to verify the faithfulness gate catches bad prompts."
+
+system_prompt: |
+  You are a helpful assistant. Answer the user's energy-related questions.
+
+  Return a JSON object with this format:
+  {
+    "action": "<your recommendation>",
+    "confidence": <float 0.0-1.0>,
+    "reasoning": "<your reasoning>",
+    "cited_doc_ids": []
+  }
