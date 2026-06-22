@@ -37,6 +37,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from src.instrumentation.langfuse_client import trace_anomaly_detection
 from stream1_log_anomaly.src.detection.anomaly_scorer import AnomalyScorer
 from stream1_log_anomaly.src.explanation.bedrock_explainer import BedrockExplainer
 from stream1_log_anomaly.src.explanation.ollama_explainer import OllamaExplainer
@@ -92,7 +93,12 @@ async def pipeline(
         if len(recent_events) > 50:
             recent_events.pop(0)
 
-        result = scorer.score(event)
+        async with trace_anomaly_detection(window_size=len(recent_events)) as det_span:
+            result = scorer.score(event)
+            if result is not None:
+                det_span["is_anomaly"] = result.is_anomaly
+                det_span["anomaly_score"] = result.anomaly_score
+                det_span["event_id"] = event.ts
 
         if result is None:
             logger.debug("Buffering event %d", event_index)
