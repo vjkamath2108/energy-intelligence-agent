@@ -68,7 +68,9 @@ class OllamaRecommender:
     scorer: ConfidenceScorer = field(default_factory=ConfidenceScorer)
 
     def __post_init__(self) -> None:
-        self._client = httpx.AsyncClient(base_url=self.base_url, timeout=_OLLAMA_TIMEOUT_S)
+        self._client = httpx.AsyncClient(
+            base_url=self.base_url, timeout=_OLLAMA_TIMEOUT_S
+        )
         self._system_prompt = load_system_prompt(self.prompt_version)
 
     async def check_health(self) -> None:
@@ -166,8 +168,7 @@ class OllamaRecommender:
         except (ValueError, json.JSONDecodeError) as e:
             logger.warning("JSON parse failed — retrying: %s", e)
             retry_msg = (
-                user_message
-                + "\n\nReturn ONLY a valid JSON object. No other text."
+                user_message + "\n\nReturn ONLY a valid JSON object. No other text."
             )
             raw = await self._call_ollama(retry_msg)
             parsed = parse_llm_output(raw, context_docs)
@@ -199,7 +200,9 @@ class OllamaRecommender:
             supporting_documents=parsed["supporting_documents"],
             reasoning=parsed["reasoning"],
             requires_human_review=(
-                requires_review or not safety.is_grounded or not constraint_result.passed
+                requires_review
+                or not safety.is_grounded
+                or not constraint_result.passed
             ),
             hallucination_flagged=not safety.is_grounded,
         )

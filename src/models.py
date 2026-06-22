@@ -57,8 +57,12 @@ class DispatchRecommendation(BaseModel):
         default_factory=lambda: str(uuid.uuid4()),
         description="Stable UUID4 identifier for this recommendation.",
     )
-    query: str = Field(description="The original natural-language query from the operator.")
-    action: str = Field(description="The recommended dispatch action in plain language.")
+    query: str = Field(
+        description="The original natural-language query from the operator."
+    )
+    action: str = Field(
+        description="The recommended dispatch action in plain language."
+    )
     confidence: float = Field(
         ge=0.0,
         le=1.0,
@@ -140,9 +144,7 @@ class LogEvent(BaseModel):
     timestamp: datetime = Field(
         description="Wall-clock time at which the log line was emitted."
     )
-    level: Literal["INFO", "WARN", "ERROR"] = Field(
-        description="Log severity level."
-    )
+    level: Literal["INFO", "WARN", "ERROR"] = Field(description="Log severity level.")
     service: str = Field(
         description="Name of the service or pod that emitted the log line."
     )

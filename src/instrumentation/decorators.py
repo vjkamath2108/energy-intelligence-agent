@@ -55,8 +55,10 @@ def traced_span(span_name: str, *, as_type: str = "span") -> Callable[[F], F]:
         def score(self, event: LogEvent) -> AnomalyResult | None:
             ...
     """
+
     def decorator(fn: F) -> F:
         if inspect.iscoroutinefunction(fn):
+
             @functools.wraps(fn)
             async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
                 lf = get_langfuse()
@@ -65,7 +67,7 @@ def traced_span(span_name: str, *, as_type: str = "span") -> Callable[[F], F]:
 
                 start = time.monotonic()
                 try:
-                    with lf.start_as_current_observation(
+                    with lf.start_as_current_observation(  # type: ignore[call-overload]
                         name=span_name,
                         as_type=as_type,
                     ) as span:
@@ -79,13 +81,15 @@ def traced_span(span_name: str, *, as_type: str = "span") -> Callable[[F], F]:
                 except Exception as e:
                     logger.debug(
                         "traced_span(%r) Langfuse error — calling unwrapped: %s",
-                        span_name, e,
+                        span_name,
+                        e,
                     )
                     return await fn(*args, **kwargs)
 
             return async_wrapper  # type: ignore[return-value]
 
         else:
+
             @functools.wraps(fn)
             def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
                 lf = get_langfuse()
@@ -94,7 +98,7 @@ def traced_span(span_name: str, *, as_type: str = "span") -> Callable[[F], F]:
 
                 start = time.monotonic()
                 try:
-                    with lf.start_as_current_observation(
+                    with lf.start_as_current_observation(  # type: ignore[call-overload]
                         name=span_name,
                         as_type=as_type,
                     ) as span:
@@ -108,7 +112,8 @@ def traced_span(span_name: str, *, as_type: str = "span") -> Callable[[F], F]:
                 except Exception as e:
                     logger.debug(
                         "traced_span(%r) Langfuse error — calling unwrapped: %s",
-                        span_name, e,
+                        span_name,
+                        e,
                     )
                     return fn(*args, **kwargs)
 

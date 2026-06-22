@@ -20,7 +20,7 @@ _SECTION_RE = re.compile(
     r"(?m)^(?:"
     r"(?:Section|Article|Clause|Appendix|Schedule|Part)\s+\d+"
     r"|(?:#+\s)"
-    r"|\d+\.\s+[A-Z]"         # top-level only — "1. Overview" not "1.1 sub-clause"
+    r"|\d+\.\s+[A-Z]"  # top-level only — "1. Overview" not "1.1 sub-clause"
     r")"
 )
 

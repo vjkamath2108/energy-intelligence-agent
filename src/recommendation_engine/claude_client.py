@@ -24,8 +24,8 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, cast
 
-import boto3  # type: ignore[import-untyped]
-from botocore.exceptions import ClientError  # type: ignore[import-untyped]
+import boto3
+from botocore.exceptions import ClientError
 
 from src.models import DispatchRecommendation, RetrievedDocument
 from src.recommendation_engine._parsing import ParsedLLMOutput, parse_llm_output
@@ -91,16 +91,20 @@ def _call_bedrock_sync(
             code = e.response["Error"]["Code"]
             retryable = code in ("ThrottlingException", "ServiceUnavailableException")
             if retryable and attempt < _MAX_RETRIES - 1:
-                wait = _BASE_BACKOFF * (2 ** attempt)
+                wait = _BASE_BACKOFF * (2**attempt)
                 logger.warning(
                     "Bedrock throttled — retrying in %.1fs (%d/%d)",
-                    wait, attempt + 1, _MAX_RETRIES,
+                    wait,
+                    attempt + 1,
+                    _MAX_RETRIES,
                 )
                 time.sleep(wait)
             else:
                 raise
 
-    raise RuntimeError(f"Bedrock call failed after {_MAX_RETRIES} attempts")  # pragma: no cover
+    raise RuntimeError(
+        f"Bedrock call failed after {_MAX_RETRIES} attempts"
+    )  # pragma: no cover
 
 
 @dataclass
@@ -214,7 +218,9 @@ class ClaudeRecommender:
             supporting_documents=parsed["supporting_documents"],
             reasoning=parsed["reasoning"],
             requires_human_review=(
-                requires_review or not safety.is_grounded or not constraint_result.passed
+                requires_review
+                or not safety.is_grounded
+                or not constraint_result.passed
             ),
             hallucination_flagged=not safety.is_grounded,
         )

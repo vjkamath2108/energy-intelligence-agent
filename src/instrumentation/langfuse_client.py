@@ -242,12 +242,15 @@ async def trace_generation(
                 usage: dict[str, int] | None = None
                 if "input_tokens" in span_data or "output_tokens" in span_data:
                     usage = {
-                        "input": int(span_data.get("input_tokens", 0)),
-                        "output": int(span_data.get("output_tokens", 0)),
+                        "input": int(span_data.get("input_tokens", 0) or 0),  # type: ignore[call-overload]
+                        "output": int(span_data.get("output_tokens", 0) or 0),  # type: ignore[call-overload]
                     }
                 span.update(
-                    output={k: v for k, v in span_data.items()
-                            if k not in ("input_tokens", "output_tokens")},
+                    output={
+                        k: v
+                        for k, v in span_data.items()
+                        if k not in ("input_tokens", "output_tokens")
+                    },
                     usage=usage,
                     metadata={"latency_ms": round(elapsed, 1)},
                 )

@@ -223,15 +223,14 @@ def _rrf_fuse(
 # ---------------------------------------------------------------------------
 
 _TEST_QUERIES = [
-    "BSUoS balancing services charges",          # favours BM25 — exact acronym
-    "grid frequency stability obligations",       # favours semantic — paraphrase
-    "TNUoS tariff 2024",                          # mixed — acronym + year
-    "dispatch instruction balancing mechanism",   # mixed — domain terms + intent
+    "BSUoS balancing services charges",  # favours BM25 — exact acronym
+    "grid frequency stability obligations",  # favours semantic — paraphrase
+    "TNUoS tariff 2024",  # mixed — acronym + year
+    "dispatch instruction balancing mechanism",  # mixed — domain terms + intent
 ]
 
 
 async def _smoke_test() -> None:
-    import os
     from src.db import close_pool
 
     logging.basicConfig(
@@ -245,9 +244,9 @@ async def _smoke_test() -> None:
         await retriever.apply_schema()
 
         for query in _TEST_QUERIES:
-            print(f"\n{'='*60}")
+            print(f"\n{'=' * 60}")
             print(f"Query: {query!r}")
-            print(f"{'='*60}")
+            print(f"{'=' * 60}")
 
             results = await retriever.search(query, k=5)
 

@@ -145,6 +145,7 @@ async def get_connection() -> AsyncGenerator[Connection, None]:
 
 # -- Smoke test ---------------------------------------------------------------
 
+
 async def _smoke_test() -> None:
     """Connect, query server version and pgvector extension, then disconnect."""
     logging.basicConfig(

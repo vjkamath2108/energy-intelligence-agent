@@ -85,7 +85,9 @@ def compute_composite_score(signals: ConfidenceSignals) -> float:
     """
     grounding_score = signals.safety_result.term_overlap_ratio
     if signals.safety_result.semantic_similarity is not None:
-        grounding_score = (grounding_score + signals.safety_result.semantic_similarity) / 2.0
+        grounding_score = (
+            grounding_score + signals.safety_result.semantic_similarity
+        ) / 2.0
 
     if signals.supporting_documents:
         retrieval_score = sum(

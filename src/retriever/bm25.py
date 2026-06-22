@@ -11,7 +11,6 @@ Public API:
 
 import asyncio
 import logging
-import os
 import pathlib
 
 from src.db import close_pool, get_connection

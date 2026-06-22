@@ -1,0 +1,20 @@
+[run]
+source = src
+
+[report]
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    raise NotImplementedError
+    if TYPE_CHECKING:
+    @abstractmethod
+
+omit =
+    # Requires live PostgreSQL + asyncpg — tested via integration tests only
+    src/db.py
+    src/retriever/bm25.py
+    src/retriever/hybrid_retriever.py
+    # Requires AWS Bedrock — tested via integration tests only
+    src/retriever/embeddings.py
+    # Requires live DB for document ingestion
+    src/data_pipeline/ingest.py

@@ -45,10 +45,10 @@ class ChunkMetrics:
 
     strategy: str
     total_chunks: int
-    avg_chunk_size: float       # characters
-    max_chunk_size: int         # characters
-    min_chunk_size: int         # characters
-    overlap_pct: float          # estimated: (overlap_tokens / chunk_size) * 100
+    avg_chunk_size: float  # characters
+    max_chunk_size: int  # characters
+    min_chunk_size: int  # characters
+    overlap_pct: float  # estimated: (overlap_tokens / chunk_size) * 100
     docs_per_second: float
 
 
@@ -80,7 +80,9 @@ def _measure(
     elapsed = time.perf_counter() - t0
 
     sizes = [len(c.content) for c in all_chunks]
-    overlap_pct = (overlap_tokens / chunk_size_tokens * 100) if chunk_size_tokens else 0.0
+    overlap_pct = (
+        (overlap_tokens / chunk_size_tokens * 100) if chunk_size_tokens else 0.0
+    )
 
     return (
         ChunkMetrics(
@@ -104,28 +106,37 @@ def print_comparison_table(metrics: list[ChunkMetrics]) -> None:
     """
     col_w = [22, 13, 16, 14, 14, 12, 18]
     headers = [
-        "Strategy", "Total Chunks", "Avg Size (chars)",
-        "Max (chars)", "Min (chars)", "Overlap %", "Docs/second",
+        "Strategy",
+        "Total Chunks",
+        "Avg Size (chars)",
+        "Max (chars)",
+        "Min (chars)",
+        "Overlap %",
+        "Docs/second",
     ]
     sep = "+" + "+".join("-" * w for w in col_w) + "+"
-    header_row = "|" + "|".join(
-        h.center(w) for h, w in zip(headers, col_w)
-    ) + "|"
+    header_row = "|" + "|".join(h.center(w) for h, w in zip(headers, col_w)) + "|"
 
     print("\n" + sep)
     print(header_row)
     print(sep)
 
     for m in metrics:
-        row = "|" + "|".join([
-            m.strategy.center(col_w[0]),
-            str(m.total_chunks).center(col_w[1]),
-            f"{m.avg_chunk_size:,.0f}".center(col_w[2]),
-            str(m.max_chunk_size).center(col_w[3]),
-            str(m.min_chunk_size).center(col_w[4]),
-            f"{m.overlap_pct:.1f}%".center(col_w[5]),
-            f"{m.docs_per_second:.1f}".center(col_w[6]),
-        ]) + "|"
+        row = (
+            "|"
+            + "|".join(
+                [
+                    m.strategy.center(col_w[0]),
+                    str(m.total_chunks).center(col_w[1]),
+                    f"{m.avg_chunk_size:,.0f}".center(col_w[2]),
+                    str(m.max_chunk_size).center(col_w[3]),
+                    str(m.min_chunk_size).center(col_w[4]),
+                    f"{m.overlap_pct:.1f}%".center(col_w[5]),
+                    f"{m.docs_per_second:.1f}".center(col_w[6]),
+                ]
+            )
+            + "|"
+        )
         print(row)
 
     print(sep + "\n")
@@ -155,6 +166,7 @@ async def _ensure_schema(conn: object) -> None:
         conn: An asyncpg connection with pgvector already registered.
     """
     import pathlib
+
     # pgvector extension must exist before CREATE TABLE uses vector(1536)
     await conn.execute("CREATE EXTENSION IF NOT EXISTS vector;")  # type: ignore[attr-defined]
     ddl = (pathlib.Path(__file__).parent / "schema.sql").read_text()
@@ -226,16 +238,25 @@ async def run_pipeline(dry_run: bool = False, truncate: bool = False) -> None:
     semantic_chunker = SemanticChunker(max_chunk_size=800)
 
     fixed_metrics, fixed_chunks = _measure(
-        "FixedSize(512/50)", fixed_chunker, docs,
-        overlap_tokens=50, chunk_size_tokens=512,
+        "FixedSize(512/50)",
+        fixed_chunker,
+        docs,
+        overlap_tokens=50,
+        chunk_size_tokens=512,
     )
     sliding_metrics, sliding_chunks = _measure(
-        "Sliding(256/128)", sliding_chunker, docs,
-        overlap_tokens=128, chunk_size_tokens=256,
+        "Sliding(256/128)",
+        sliding_chunker,
+        docs,
+        overlap_tokens=128,
+        chunk_size_tokens=256,
     )
     semantic_metrics, semantic_chunks = _measure(
-        "Semantic(max=800)", semantic_chunker, docs,
-        overlap_tokens=0, chunk_size_tokens=800,
+        "Semantic(max=800)",
+        semantic_chunker,
+        docs,
+        overlap_tokens=0,
+        chunk_size_tokens=800,
     )
 
     logger.info(

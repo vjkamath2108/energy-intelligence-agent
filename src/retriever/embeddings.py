@@ -10,7 +10,7 @@ import asyncio
 import json
 import logging
 import time
-from typing import Any
+from typing import Any, cast
 
 import boto3
 from botocore.config import Config
@@ -86,7 +86,7 @@ class TitanEmbedder:
                     accept="application/json",
                 )
                 result: dict[str, Any] = json.loads(response["body"].read())
-                return result["embedding"]
+                return cast(list[float], result["embedding"])
             except (BotoCoreError, ClientError) as exc:
                 raise RuntimeError(f"Bedrock invoke_model failed: {exc}") from exc
 

@@ -50,9 +50,10 @@ class EnergyIntelligenceAgent:
         Returns:
             Model ID string from the active recommender.
         """
-        return (
+        return str(
             getattr(self._recommender, "model_id", None)
-            or getattr(self._recommender, "model", "unknown")
+            or getattr(self._recommender, "model", None)
+            or "unknown"
         )
 
     async def dispatch(self, query: str) -> DispatchRecommendation:

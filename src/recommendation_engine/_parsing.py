@@ -43,7 +43,9 @@ def extract_json(text: str) -> str:
     return cleaned[start : end + 1]
 
 
-def parse_llm_output(text: str, context_docs: list[RetrievedDocument]) -> ParsedLLMOutput:
+def parse_llm_output(
+    text: str, context_docs: list[RetrievedDocument]
+) -> ParsedLLMOutput:
     """Parse and validate the LLM JSON response into a typed dict.
 
     Cross-references cited_doc_ids against the provided context docs.
@@ -80,7 +82,9 @@ def parse_llm_output(text: str, context_docs: list[RetrievedDocument]) -> Parsed
     try:
         confidence = max(0.0, min(1.0, float(raw.get("confidence", 0.5))))
     except (TypeError, ValueError):
-        logger.warning("Invalid confidence value %r — defaulting to 0.5", raw.get("confidence"))
+        logger.warning(
+            "Invalid confidence value %r — defaulting to 0.5", raw.get("confidence")
+        )
         confidence = 0.5
 
     return ParsedLLMOutput(

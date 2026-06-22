@@ -30,55 +30,110 @@ class SyntheticDocument(TypedDict):
 # ---------------------------------------------------------------------------
 
 _REGULATION_NAMES = [
-    "dno-p28", "grid-code-section-4", "grid-code-section-6",
-    "ner-licence-condition-c17", "ner-licence-condition-d14",
-    "eso-balancing-code-bc1", "eso-balancing-code-bc3",
-    "gg-o6-dispatch-principles", "sqss-engineering-recommendation",
-    "p305-modification", "p354-modification", "cusc-section-11",
-    "cusc-section-14", "bsc-section-v", "bsc-section-x",
-    "connection-conditions-cc6", "transmission-licence-special-conditions",
-    "distribution-code-dcp228", "ofgem-decision-ref-2024-031",
+    "dno-p28",
+    "grid-code-section-4",
+    "grid-code-section-6",
+    "ner-licence-condition-c17",
+    "ner-licence-condition-d14",
+    "eso-balancing-code-bc1",
+    "eso-balancing-code-bc3",
+    "gg-o6-dispatch-principles",
+    "sqss-engineering-recommendation",
+    "p305-modification",
+    "p354-modification",
+    "cusc-section-11",
+    "cusc-section-14",
+    "bsc-section-v",
+    "bsc-section-x",
+    "connection-conditions-cc6",
+    "transmission-licence-special-conditions",
+    "distribution-code-dcp228",
+    "ofgem-decision-ref-2024-031",
     "ner-standard-licence-conditions-2024",
 ]
 
 _TARIFF_NAMES = [
-    "tnuos-charges-2024", "tnuos-charges-2025",
-    "bsuos-rates-q1-2024", "bsuos-rates-q2-2024",
-    "bsuos-rates-q3-2024", "bsuos-rates-q4-2024",
-    "duos-charges-enwl-2024", "duos-charges-ssen-2024",
-    "duos-charges-ukpn-2024", "duos-charges-npg-2024",
-    "capacity-market-settlement-2024", "ro-obligation-level-2024",
-    "cfd-strike-prices-ar5", "cfd-strike-prices-ar6",
-    "embedded-benefits-statement-2024", "reactive-power-tariff-2024",
-    "black-start-service-charges-2024", "firm-frequency-response-tariff",
-    "mandatory-frequency-response-tariff", "enhanced-frequency-response-tariff",
+    "tnuos-charges-2024",
+    "tnuos-charges-2025",
+    "bsuos-rates-q1-2024",
+    "bsuos-rates-q2-2024",
+    "bsuos-rates-q3-2024",
+    "bsuos-rates-q4-2024",
+    "duos-charges-enwl-2024",
+    "duos-charges-ssen-2024",
+    "duos-charges-ukpn-2024",
+    "duos-charges-npg-2024",
+    "capacity-market-settlement-2024",
+    "ro-obligation-level-2024",
+    "cfd-strike-prices-ar5",
+    "cfd-strike-prices-ar6",
+    "embedded-benefits-statement-2024",
+    "reactive-power-tariff-2024",
+    "black-start-service-charges-2024",
+    "firm-frequency-response-tariff",
+    "mandatory-frequency-response-tariff",
+    "enhanced-frequency-response-tariff",
 ]
 
 _DECISION_NAMES = [
-    "dispatch-2024-01-15", "dispatch-2024-02-03", "dispatch-2024-03-22",
-    "dispatch-2024-04-11", "dispatch-2024-05-07", "dispatch-2024-06-19",
-    "balancing-action-refs-q1", "balancing-action-refs-q2",
-    "constraint-management-2024-north", "constraint-management-2024-south",
-    "redispatch-event-2024-0312", "redispatch-event-2024-0517",
-    "bm-unit-acceptance-2024-jan", "bm-unit-acceptance-2024-apr",
-    "reserve-activation-2024-q1", "reserve-activation-2024-q2",
-    "emergency-instruction-2024-001", "emergency-instruction-2024-002",
-    "post-event-report-2024-0601", "post-event-report-2024-0823",
-    "balancing-mechanism-report-h1-2024", "ngeso-control-room-log-2024-q1",
+    "dispatch-2024-01-15",
+    "dispatch-2024-02-03",
+    "dispatch-2024-03-22",
+    "dispatch-2024-04-11",
+    "dispatch-2024-05-07",
+    "dispatch-2024-06-19",
+    "balancing-action-refs-q1",
+    "balancing-action-refs-q2",
+    "constraint-management-2024-north",
+    "constraint-management-2024-south",
+    "redispatch-event-2024-0312",
+    "redispatch-event-2024-0517",
+    "bm-unit-acceptance-2024-jan",
+    "bm-unit-acceptance-2024-apr",
+    "reserve-activation-2024-q1",
+    "reserve-activation-2024-q2",
+    "emergency-instruction-2024-001",
+    "emergency-instruction-2024-002",
+    "post-event-report-2024-0601",
+    "post-event-report-2024-0823",
+    "balancing-mechanism-report-h1-2024",
+    "ngeso-control-room-log-2024-q1",
 ]
 
 _VOLTAGE_LEVELS = ["11 kV", "33 kV", "132 kV", "275 kV", "400 kV"]
 _SERVICES = ["FFR", "DC Low", "DC High", "BM", "STOR", "Fast Reserve", "Black Start"]
-_REGIONS = ["North Scotland", "South Scotland", "North West", "North East",
-            "Yorkshire", "East Midlands", "West Midlands", "East", "London",
-            "South East", "South West", "Wales"]
-_UNITS = ["DRAX1G", "HUMR1G", "TORN1G", "STTG1G", "PEHE1G",
-          "RATS1G", "ABTH1G", "FAWN1G", "COTPS1", "FERR1G"]
+_REGIONS = [
+    "North Scotland",
+    "South Scotland",
+    "North West",
+    "North East",
+    "Yorkshire",
+    "East Midlands",
+    "West Midlands",
+    "East",
+    "London",
+    "South East",
+    "South West",
+    "Wales",
+]
+_UNITS = [
+    "DRAX1G",
+    "HUMR1G",
+    "TORN1G",
+    "STTG1G",
+    "PEHE1G",
+    "RATS1G",
+    "ABTH1G",
+    "FAWN1G",
+    "COTPS1",
+    "FERR1G",
+]
 
 
 # ---------------------------------------------------------------------------
 # Per-category content generators
 # ---------------------------------------------------------------------------
+
 
 def _regulation_content(name: str) -> str:
     """Generate a realistic regulation document."""
@@ -169,12 +224,13 @@ def _regulation_content(name: str) -> str:
 # This lets BM25 rank the correct source prefix highest for each query.
 # ---------------------------------------------------------------------------
 
+
 def _tnuos_content(name: str) -> str:
     """TNUoS-specific tariff schedule — Transmission Network Use of System charges."""
     year = 2024 if "2024" in name else 2025
     region = random.choice(_REGIONS)
     return textwrap.dedent(f"""
-    # TNUoS CHARGE SCHEDULE: {name.upper().replace('-', ' ')}
+    # TNUoS CHARGE SCHEDULE: {name.upper().replace("-", " ")}
     ## Transmission Network Use of System (TNUoS) Charges — {year}
 
     Section 1 — TNUoS Generation Tariff Structure
@@ -248,7 +304,7 @@ def _bsuos_content(name: str) -> str:
         (q.upper() for q in ("q1", "q2", "q3", "q4") if q in name.lower()), "ANNUAL"
     )
     return textwrap.dedent(f"""
-    # BSUoS CHARGE SCHEDULE: {name.upper().replace('-', ' ')}
+    # BSUoS CHARGE SCHEDULE: {name.upper().replace("-", " ")}
     ## Balancing Services Use of System (BSUoS) Charges — {quarter} {year}
 
     Section 1 — BSUoS Charge Overview
@@ -330,9 +386,14 @@ def _duos_content(name: str) -> str:
     paragraph so no single chunk lacks the terms needed for BM25 matching.
     """
     year = 2024 if "2024" in name else 2025
-    dno = name.split("duos-charges-")[-1].replace("-2024", "").replace("-2025", "").upper()
+    dno = (
+        name.split("duos-charges-")[-1]
+        .replace("-2024", "")
+        .replace("-2025", "")
+        .upper()
+    )
     return textwrap.dedent(f"""
-    # DUoS CHARGE SCHEDULE: {name.upper().replace('-', ' ')}
+    # DUoS CHARGE SCHEDULE: {name.upper().replace("-", " ")}
     ## Distribution Use of System (DUoS) Charges — {dno} {year}
 
     Section 1 — DUoS Band Structure and Unit Charges
@@ -398,7 +459,7 @@ def _capacity_market_content(name: str) -> str:
     """Capacity Market-specific tariff schedule — T-4 and T-1 agreements."""
     year = 2024 if "2024" in name else 2025
     return textwrap.dedent(f"""
-    # CAPACITY MARKET SETTLEMENT SCHEDULE: {name.upper().replace('-', ' ')}
+    # CAPACITY MARKET SETTLEMENT SCHEDULE: {name.upper().replace("-", " ")}
     ## Capacity Market (CM) Agreements and Penalty Rates — {year}
 
     Section 1 — Capacity Market Agreement Types
@@ -476,11 +537,9 @@ def _capacity_market_content(name: str) -> str:
 def _generic_tariff_content(name: str) -> str:
     """Generic tariff schedule for non-primary tariff types."""
     year = 2024 if "2024" in name else 2025
-    quarter = next(
-        (q for q in ("q1", "q2", "q3", "q4") if q in name.lower()), "annual"
-    )
+    quarter = next((q for q in ("q1", "q2", "q3", "q4") if q in name.lower()), "annual")
     return textwrap.dedent(f"""
-    # TARIFF SCHEDULE: {name.upper().replace('-', ' ')}
+    # TARIFF SCHEDULE: {name.upper().replace("-", " ")}
     ## Effective Period: {year} {quarter.upper()}
 
     Section 1 — Tariff Overview
@@ -543,7 +602,7 @@ def _decision_content(name: str) -> str:
     price = random.uniform(45.0, 250.0)
     return textwrap.dedent(f"""
     # DISPATCH / BALANCING ACTION RECORD
-    ## Reference: {name.upper().replace('-', ' ')}
+    ## Reference: {name.upper().replace("-", " ")}
 
     Section 1 — Event Summary
 
@@ -552,7 +611,7 @@ def _decision_content(name: str) -> str:
 
     1.2 The instruction was issued in response to a system imbalance event
     in the {random.choice(_REGIONS)} region requiring {mw_accepted} MW of
-    {'upward' if random.random() > 0.5 else 'downward'} balancing action.
+    {"upward" if random.random() > 0.5 else "downward"} balancing action.
 
     1.3 Gate closure time: Settlement Period {random.randint(1, 48)},
     Gate closure volume accepted: {mw_accepted} MW at £{price:.2f}/MWh.
@@ -560,15 +619,19 @@ def _decision_content(name: str) -> str:
     Section 2 — Offer Stack at Time of Dispatch
 
     2.1 The accepted offer from {unit} was the
-    {random.choice(['cheapest available', 'only available', 'most accessible'])}
+    {random.choice(["cheapest available", "only available", "most accessible"])}
     offer in the {random.choice(_REGIONS)} constraint zone at the time of dispatch.
 
     2.2 Full offer stack (top 5 accepted):
-    - {random.choice(_UNITS)}: {random.randint(50, 500)} MW @ £{random.uniform(40, 200):.2f}/MWh
-    - {random.choice(_UNITS)}: {random.randint(50, 400)} MW @ £{random.uniform(50, 220):.2f}/MWh
+    - {random.choice(_UNITS)}: {random.randint(50, 500)} MW @ £{
+        random.uniform(40, 200):.2f}/MWh
+    - {random.choice(_UNITS)}: {random.randint(50, 400)} MW @ £{
+        random.uniform(50, 220):.2f}/MWh
     - {unit}: {mw_accepted} MW @ £{price:.2f}/MWh
-    - {random.choice(_UNITS)}: {random.randint(30, 300)} MW @ £{random.uniform(60, 250):.2f}/MWh
-    - {random.choice(_UNITS)}: {random.randint(20, 200)} MW @ £{random.uniform(70, 280):.2f}/MWh
+    - {random.choice(_UNITS)}: {random.randint(30, 300)} MW @ £{
+        random.uniform(60, 250):.2f}/MWh
+    - {random.choice(_UNITS)}: {random.randint(20, 200)} MW @ £{
+        random.uniform(70, 280):.2f}/MWh
 
     Article 3 — Constraint Background
 
@@ -594,18 +657,23 @@ def _decision_content(name: str) -> str:
     5.1 System frequency deviation: {random.uniform(-0.3, 0.3):.3f} Hz
     5.2 Duration of constraint: {random.randint(15, 240)} minutes
     5.3 Constraint cost: £{random.uniform(10000, 500000):,.2f}
-    5.4 Review outcome: {random.choice([
-        'No further action required.',
-        'Flagged for network investment appraisal.',
-        'Referred to Ofgem for licence compliance review.',
-        'Included in quarterly constraint cost report.',
-    ])}
+    5.4 Review outcome: {
+        random.choice(
+            [
+                "No further action required.",
+                "Flagged for network investment appraisal.",
+                "Referred to Ofgem for licence compliance review.",
+                "Included in quarterly constraint cost report.",
+            ]
+        )
+    }
     """)
 
 
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 def generate_documents() -> list[SyntheticDocument]:
     """Generate ~100 synthetic energy documents across three categories.
@@ -618,27 +686,33 @@ def generate_documents() -> list[SyntheticDocument]:
 
     reg_names = random.sample(_REGULATION_NAMES, min(34, len(_REGULATION_NAMES)))
     for name in reg_names:
-        docs.append({
-            "source": f"regulations/{name}.pdf",
-            "content": _regulation_content(name),
-            "category": "regulations",
-        })
+        docs.append(
+            {
+                "source": f"regulations/{name}.pdf",
+                "content": _regulation_content(name),
+                "category": "regulations",
+            }
+        )
 
     tar_names = random.sample(_TARIFF_NAMES, min(33, len(_TARIFF_NAMES)))
     for name in tar_names:
-        docs.append({
-            "source": f"tariffs/{name}.pdf",
-            "content": _tariff_content(name),
-            "category": "tariffs",
-        })
+        docs.append(
+            {
+                "source": f"tariffs/{name}.pdf",
+                "content": _tariff_content(name),
+                "category": "tariffs",
+            }
+        )
 
     dec_names = random.sample(_DECISION_NAMES, min(33, len(_DECISION_NAMES)))
     for name in dec_names:
-        docs.append({
-            "source": f"decisions/{name}.pdf",
-            "content": _decision_content(name),
-            "category": "decisions",
-        })
+        docs.append(
+            {
+                "source": f"decisions/{name}.pdf",
+                "content": _decision_content(name),
+                "category": "decisions",
+            }
+        )
 
     return docs
 

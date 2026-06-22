@@ -24,18 +24,70 @@ from src.models import RetrievedDocument
 
 logger = logging.getLogger(__name__)
 
-HUMAN_REVIEW_THRESHOLD: float = 0.60   # W4.1 will calibrate against validation set
+HUMAN_REVIEW_THRESHOLD: float = 0.60  # W4.1 will calibrate against validation set
 TERM_OVERLAP_THRESHOLD: float = 0.30
 SEMANTIC_THRESHOLD: float = 0.50
 
-_STOPWORDS = frozenset({
-    "the", "a", "an", "is", "in", "of", "to", "and", "for", "that",
-    "this", "with", "be", "are", "was", "were", "will", "would", "can",
-    "should", "have", "has", "had", "by", "from", "at", "as", "on",
-    "it", "its", "or", "not", "but", "we", "our", "you", "they", "their",
-    "which", "when", "where", "how", "what", "who", "all", "any", "may",
-    "if", "so", "do", "did", "does", "been", "being", "get", "got",
-})
+_STOPWORDS = frozenset(
+    {
+        "the",
+        "a",
+        "an",
+        "is",
+        "in",
+        "of",
+        "to",
+        "and",
+        "for",
+        "that",
+        "this",
+        "with",
+        "be",
+        "are",
+        "was",
+        "were",
+        "will",
+        "would",
+        "can",
+        "should",
+        "have",
+        "has",
+        "had",
+        "by",
+        "from",
+        "at",
+        "as",
+        "on",
+        "it",
+        "its",
+        "or",
+        "not",
+        "but",
+        "we",
+        "our",
+        "you",
+        "they",
+        "their",
+        "which",
+        "when",
+        "where",
+        "how",
+        "what",
+        "who",
+        "all",
+        "any",
+        "may",
+        "if",
+        "so",
+        "do",
+        "did",
+        "does",
+        "been",
+        "being",
+        "get",
+        "got",
+    }
+)
 
 
 @runtime_checkable

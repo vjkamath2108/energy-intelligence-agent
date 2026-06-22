@@ -88,14 +88,14 @@ _DIRECTIONAL_PROHIBITION_PATTERNS: list[re.Pattern[str]] = [
 _BM_UNIT_ID = r"\b([A-Z]{2,6}[0-9][A-Z]?)\b"
 _UNIT_PROHIBITION_PATTERNS: list[re.Pattern[str]] = [
     re.compile(
-        r"BM\s+[Uu]nit\s+" + _BM_UNIT_ID
+        r"BM\s+[Uu]nit\s+"
+        + _BM_UNIT_ID
         + r"\s+(?:must\s+not|shall\s+not|cannot|may\s+not)"
         r"\s+(?:be\s+dispatched|participate|receive\s+dispatch)",
         re.IGNORECASE,
     ),
     re.compile(
-        _BM_UNIT_ID
-        + r"\s+(?:must\s+not|shall\s+not|cannot|is\s+not\s+permitted\s+to)"
+        _BM_UNIT_ID + r"\s+(?:must\s+not|shall\s+not|cannot|is\s+not\s+permitted\s+to)"
         r"\s+(?:be\s+dispatched|generate|provide\s+balancing)",
         re.IGNORECASE,
     ),
@@ -194,9 +194,7 @@ def _sentences(text: str) -> list[str]:
     return [s.strip() for s in re.split(r"[.!?]", text) if s.strip()]
 
 
-def _extract_mw_ceilings(
-    sentence: str, doc_id: str
-) -> list[ExtractedConstraint]:
+def _extract_mw_ceilings(sentence: str, doc_id: str) -> list[ExtractedConstraint]:
     """Extract all MW ceiling constraints from a single sentence.
 
     Args:
@@ -260,9 +258,7 @@ def _extract_directional_prohibitions(
     return results
 
 
-def _extract_unit_prohibitions(
-    sentence: str, doc_id: str
-) -> list[ExtractedConstraint]:
+def _extract_unit_prohibitions(sentence: str, doc_id: str) -> list[ExtractedConstraint]:
     """Extract BM unit dispatch prohibitions from a single sentence.
 
     Args:
@@ -316,7 +312,9 @@ def extract_constraints(docs: list[RetrievedDocument]) -> list[ExtractedConstrai
 
     if all_constraints:
         logger.debug(
-            "Extracted %d constraints from %d documents", len(all_constraints), len(docs)
+            "Extracted %d constraints from %d documents",
+            len(all_constraints),
+            len(docs),
         )
     return all_constraints
 
@@ -469,9 +467,7 @@ def validate_action(
     )
 
 
-def check_constraints(
-    action: str, docs: list[RetrievedDocument]
-) -> ValidationResult:
+def check_constraints(action: str, docs: list[RetrievedDocument]) -> ValidationResult:
     """Extract constraints from docs then validate the action in one call.
 
     Convenience wrapper for the common pipeline case. Equivalent to:

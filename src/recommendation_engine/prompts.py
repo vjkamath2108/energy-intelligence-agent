@@ -72,7 +72,9 @@ def build_user_message(query: str, context_docs: list[RetrievedDocument]) -> str
             f"    content: {snippet}"
         )
 
-    context_block = "\n\n".join(context_parts) if context_parts else "(no documents retrieved)"
+    context_block = (
+        "\n\n".join(context_parts) if context_parts else "(no documents retrieved)"
+    )
 
     return (
         f"Operator query: {query}\n\n"
