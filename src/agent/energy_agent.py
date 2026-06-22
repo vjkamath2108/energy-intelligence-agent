@@ -6,6 +6,7 @@ never raises; failures produce a fallback with requires_human_review=True.
 """
 
 import logging
+import time
 from dataclasses import dataclass, field
 from typing import Literal
 
@@ -15,6 +16,7 @@ from src.instrumentation.langfuse_client import (
     trace_generation,
     trace_retrieval,
 )
+from src.instrumentation.rag_log import append_dispatch
 from src.models import DispatchRecommendation, RetrievedDocument
 from src.recommendation_engine.claude_client import ClaudeRecommender
 from src.recommendation_engine.ollama_client import OllamaRecommender
@@ -68,6 +70,7 @@ class EnergyIntelligenceAgent:
         """
         docs: list[RetrievedDocument] = []
         rec: DispatchRecommendation
+        _pipeline_start = time.monotonic()
 
         async with trace_dispatch(query) as dispatch_span:
             try:
@@ -107,6 +110,9 @@ class EnergyIntelligenceAgent:
             dispatch_span["recommendation_id"] = rec.recommendation_id
             dispatch_span["confidence"] = rec.confidence
             dispatch_span["requires_human_review"] = rec.requires_human_review
+
+        latency_ms = (time.monotonic() - _pipeline_start) * 1000
+        append_dispatch(rec, self.backend, latency_ms, len(docs))
 
         try:
             entry = entry_from_recommendation(rec)
