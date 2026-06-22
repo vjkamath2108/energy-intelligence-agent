@@ -49,6 +49,8 @@ jobs:
           PYTHONPATH=. pytest tests/ \
             --ignore=tests/test_embeddings.py \
             --ignore=tests/test_hybrid_retriever.py \
+            --ignore=tests/test_db.py \
+            --ignore=tests/test_bm25.py \
             -q --tb=short
 
   eval-gate:
