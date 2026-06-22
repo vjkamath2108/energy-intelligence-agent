@@ -147,7 +147,7 @@ else
   aws iam create-role \
     --role-name "$ROLE_NAME" \
     --assume-role-policy-document "$TRUST" \
-    --description "GitHub Actions OIDC role for energy-intelligence-agent CI — Bedrock only" \
+    --description "GitHub Actions OIDC role for energy-intelligence-agent CI - Bedrock only" \
     --max-session-duration 3600 \
     --no-cli-pager
   ok "Role created."
