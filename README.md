@@ -233,6 +233,33 @@ Action:    Check auth-service health endpoints and connection pool metrics.
 python -m src.agent.energy_agent --query "Optimal dispatch for peak demand"
 ```
 
+### Demo Scripts — No AWS or DB Required
+
+```bash
+pip install -r requirements.txt
+
+# RAG pipeline demo: 5 dispatch scenarios including hallucination detection
+PYTHONPATH=. python examples/demo_queries.py
+
+# Stream 1 anomaly detection demo: 300 synthetic EKS logs + Isolation Forest
+PYTHONPATH=. python examples/demo_streaming.py
+PYTHONPATH=. python examples/demo_streaming.py --max-anomalies 5
+
+# CI eval gate: faithfulness + citation coverage on 5 golden eval cases
+PYTHONPATH=. python evaluation/ci_gate.py --mock --prompt-version v1
+```
+
+Expected output from `demo_queries.py`:
+```
+SCENARIO 1: BSUoS Settlement Charge
+  Confidence  : 0.867  |  Grounded: YES  |  Human review: NO
+
+SCENARIO 5: HALLUCINATION DETECTION
+  Confidence  : 0.262  |  Grounded: NO   |  Human review: YES ⚠
+
+Result: ALL SCENARIOS PASSED — safety layer behaved as expected.
+```
+
 ---
 
 ## Benchmarking Strategy
@@ -330,7 +357,7 @@ complexity: generating DPO preference pairs in Stream 4.
 | [SAFETY.md](docs/SAFETY.md) | Responsible AI mechanisms |
 | [VECTOR_DB_ANALYSIS.md](docs/VECTOR_DB_ANALYSIS.md) | pgvector vs alternatives |
 | [CHUNKING_STRATEGY.md](docs/CHUNKING_STRATEGY.md) | Chunking approach |
-| [SOVEREIGN_INFERENCE.md](docs/SOVEREIGN_INFERENCE.md) | Data sovereignty decision framework |
+| [SOVEREIGN-INFERENCE.md](docs/SOVEREIGN-INFERENCE.md) | Data sovereignty decision framework |
 | [results/bedrock_vs_ollama_vs_mistral.md](results/bedrock_vs_ollama_vs_mistral.md) | Five-model inference benchmark across frontier, open-weight managed, and sovereign deployment tiers |
 | [results/model_comparison_report.md](results/model_comparison_report.md) | **Model comparison report** — six models, two pipelines, quantisation trade-offs, deployment recommendations, honest write-up of what went wrong |
 
