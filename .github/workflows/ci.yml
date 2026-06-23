@@ -159,6 +159,7 @@ jobs:
           DB_NAME: energy_db
           DB_USER: energy_user
           DB_PASSWORD: postgres
+          DB_SSLMODE: disable
           AWS_REGION: eu-west-2
           LANGFUSE_ENABLED: "false"
         run: |
