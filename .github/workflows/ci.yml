@@ -52,7 +52,7 @@ jobs:
         # have fully-mocked unit tests and run here without any credentials.
         # -m "not integration" skips @pytest.mark.integration tests in those files.
         run: |
-          PYTHONPATH=. pytest tests/ stream2_localslm/tests/ \
+          PYTHONPATH=. pytest tests/ stream2_localslm/tests/ stream4_finetuning/tests/ \
             --ignore=tests/test_db.py \
             -m "not integration" \
             --cov --cov-fail-under=80 \
