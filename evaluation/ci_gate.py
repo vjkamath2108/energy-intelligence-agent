@@ -377,7 +377,7 @@ def main() -> int:
         stream=sys.stderr,
     )
 
-    print(f"\nEIA Eval Gate")
+    print("\nEIA Eval Gate")
     print(f"  prompt-version : {args.prompt_version}")
     print(f"  mock           : {args.mock}")
     print(f"  cases          : {len(GOLDEN_EVAL_SET)}")
@@ -399,10 +399,16 @@ def main() -> int:
 
     print()
     print("Aggregate:")
-    print(f"  Faithfulness      {faithfulness:.0%}  (gate >= {FAITHFULNESS_GATE:.0%})  {faith_status}")
-    print(f"  Citation coverage {mean_coverage:.0%}  (gate >= {CITATION_COVERAGE_GATE:.0%})  {cov_status}")
+    print(
+        f"  Faithfulness      {faithfulness:.0%}  (gate >= {FAITHFULNESS_GATE:.0%})  {faith_status}"
+    )
+    print(
+        f"  Citation coverage {mean_coverage:.0%}  (gate >= {CITATION_COVERAGE_GATE:.0%})  {cov_status}"
+    )
 
-    passed = faithfulness >= FAITHFULNESS_GATE and mean_coverage >= CITATION_COVERAGE_GATE
+    passed = (
+        faithfulness >= FAITHFULNESS_GATE and mean_coverage >= CITATION_COVERAGE_GATE
+    )
     print()
     print(f"Overall: {'PASS' if passed else 'FAIL'}")
     return 0 if passed else 1
